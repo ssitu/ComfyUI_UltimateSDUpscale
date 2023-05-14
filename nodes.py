@@ -3,13 +3,19 @@
 import os
 import sys
 import comfy
-from .repositories import ultimate_upscale
+from .repositories import ultimate_upscale as ult
+from .utils import tensor_to_pil, pil_to_tensor
+from modules.processing import StableDiffusionProcessing
+import modules.shared as shared
+from modules.upscaler import UpscalerData
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.realpath(__file__)), "comfy"))
 
-MAX_RESOLUTION = 8192
 
+MAX_RESOLUTION = 8192
+# The modes avaiable for Ultimate SD Upscale
 MODES = ["Linear", "Chess", "None"]
+
 
 class UltimateSDUpscale:
     @classmethod
@@ -18,9 +24,9 @@ class UltimateSDUpscale:
             "required": {
                 "image": ("IMAGE",),
                 # Sampling Params
-                "model": ("MODEL",),
-                "positive": ("CONDITIONING",),
-                "negative": ("CONDITIONING",),
+                # "model": ("MODEL",),
+                # "positive": ("CONDITIONING",),
+                # "negative": ("CONDITIONING",),
                 "upscale_by": ("FLOAT", {"default": 2, "min": 0.05, "max": 4, "step": 0.05}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 10000, "step": 1}),
@@ -42,10 +48,34 @@ class UltimateSDUpscale:
     FUNCTION = "upscale"
     CATEGORY = "image/upscaling"
 
-    def upscale(self, image, model, positive, negative, upscale_by, seed, steps, cfg, sampler_name, scheduler, denoise,
+    def upscale(self, image,  # model, positive, negative,
+                upscale_by, seed, steps, cfg, sampler_name, scheduler, denoise,
                 upscale_model, mode_type, tile_width, tile_height, mask_blur, tile_padding):
+        #
+        # Set up A1111 patches
+        #
 
-        upscaled_image = image
+        # Upscaler
+        # An object that the script works with
+        shared.sd_upscalers[0] = UpscalerData()
+        # Where the actual upscaler is stored, will be used when the script upscales using the Upscaler in UpscalerData
+        shared.actual_upscaler = upscale_model
+
+        # Processing
+        sdprocessing = StableDiffusionProcessing(tensor_to_pil(image))
+
+        #
+        # Running the script
+        #
+        script = ult.Script()
+        processed = script.run(p=sdprocessing, _=None, tile_width=tile_width, tile_height=tile_height, mask_blur=mask_blur,
+                               padding=tile_padding, seams_fix_width=None, seams_fix_denoise=None, seams_fix_padding=None,
+                               upscaler_index=0, save_upscaled_image=False, redraw_mode=ult.USDUMode.LINEAR, save_seams_fix_image=False,
+                               seams_fix_mask_blur=None, seams_fix_type=ult.USDUSFMode.NONE, target_size_type=2, custom_width=None,
+                               custom_height=None, custom_scale=upscale_by)
+
+        # Return the upscaled image
+        upscaled_image = pil_to_tensor(processed.images[0])
         return (upscaled_image,)
 
 
