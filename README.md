@@ -10,6 +10,12 @@ cd ComfyUI_UltimateSDUpscale
 git submodule update --init --recursive
 ```
 
+## Usage
+Available nodes:
+```
+image > upscaling > UltimateSDUpscale
+```
+
 ## Todo
 - Make the encoding faster between tiles.
 - Add the seam fixes.
