@@ -14,7 +14,11 @@ sys.path.insert(0, os.path.join(
 
 MAX_RESOLUTION = 8192
 # The modes avaiable for Ultimate SD Upscale
-MODES = ["Linear", "Chess", "None"]
+MODES = {
+    "Linear": ult.USDUMode.LINEAR,
+    "Chess": ult.USDUMode.CHESS,
+    "None": ult.USDUMode.NONE,
+}
 
 
 class UltimateSDUpscale:
@@ -24,9 +28,10 @@ class UltimateSDUpscale:
             "required": {
                 "image": ("IMAGE",),
                 # Sampling Params
-                # "model": ("MODEL",),
-                # "positive": ("CONDITIONING",),
-                # "negative": ("CONDITIONING",),
+                "model": ("MODEL",),
+                "positive": ("CONDITIONING",),
+                "negative": ("CONDITIONING",),
+                "vae": ("VAE",),
                 "upscale_by": ("FLOAT", {"default": 2, "min": 0.05, "max": 4, "step": 0.05}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 10000, "step": 1}),
@@ -36,7 +41,7 @@ class UltimateSDUpscale:
                 "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 # Upscale Params
                 "upscale_model": ("UPSCALE_MODEL",),
-                "mode_type": (MODES,),
+                "mode_type": (list(MODES.keys()),),
                 "tile_width": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
                 "tile_height": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
                 "mask_blur": ("INT", {"default": 8, "min": 0, "max": 64, "step": 1}),
@@ -48,9 +53,9 @@ class UltimateSDUpscale:
     FUNCTION = "upscale"
     CATEGORY = "image/upscaling"
 
-    def upscale(self, image,  # model, positive, negative,
-                upscale_by, seed, steps, cfg, sampler_name, scheduler, denoise,
-                upscale_model, mode_type, tile_width, tile_height, mask_blur, tile_padding):
+    def upscale(self, image, model, positive, negative, vae, upscale_by, seed,
+                steps, cfg, sampler_name, scheduler, denoise, upscale_model,
+                mode_type, tile_width, tile_height, mask_blur, tile_padding):
         #
         # Set up A1111 patches
         #
@@ -60,9 +65,14 @@ class UltimateSDUpscale:
         shared.sd_upscalers[0] = UpscalerData()
         # Where the actual upscaler is stored, will be used when the script upscales using the Upscaler in UpscalerData
         shared.actual_upscaler = upscale_model
+        # Reset the resulting image
+        shared.tiled_image = None
 
         # Processing
-        sdprocessing = StableDiffusionProcessing(tensor_to_pil(image))
+        sdprocessing = StableDiffusionProcessing(tensor_to_pil(image),
+                                                model, positive, negative, vae,
+                                                seed, steps, cfg, sampler_name,
+                                                scheduler, denoise)
 
         #
         # Running the script
@@ -70,12 +80,12 @@ class UltimateSDUpscale:
         script = ult.Script()
         processed = script.run(p=sdprocessing, _=None, tile_width=tile_width, tile_height=tile_height, mask_blur=mask_blur,
                                padding=tile_padding, seams_fix_width=None, seams_fix_denoise=None, seams_fix_padding=None,
-                               upscaler_index=0, save_upscaled_image=False, redraw_mode=ult.USDUMode.LINEAR, save_seams_fix_image=False,
+                               upscaler_index=0, save_upscaled_image=False, redraw_mode=MODES[mode_type], save_seams_fix_image=False,
                                seams_fix_mask_blur=None, seams_fix_type=ult.USDUSFMode.NONE, target_size_type=2, custom_width=None,
                                custom_height=None, custom_scale=upscale_by)
 
-        # Return the upscaled image
-        upscaled_image = pil_to_tensor(processed.images[0])
+        # Return the resulting image
+        upscaled_image = pil_to_tensor(shared.tiled_image)
         return (upscaled_image,)
 
 
