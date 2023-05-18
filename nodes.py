@@ -74,10 +74,6 @@ class UltimateSDUpscale:
                                                  seed, steps, cfg, sampler_name,
                                                  scheduler, denoise)
 
-        # Test
-        from modules.processing import test_save
-        test_save(tensor_to_pil(image), "init")
-
         #
         # Running the script
         #
