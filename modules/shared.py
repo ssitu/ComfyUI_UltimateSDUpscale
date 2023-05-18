@@ -19,6 +19,3 @@ state = State()
 sd_upscalers = [None]
 # The upscaler usable by ComfyUI nodes
 actual_upscaler = None
-
-# The resulting image
-tiled_image = None

@@ -1,9 +1,6 @@
 # Patched classes to adapt from A111 webui for ComfyUI
 from nodes import common_ksampler, VAEEncode, VAEDecode
 from utils import pil_to_tensor, tensor_to_pil, get_mask_region, expand_crop_region, resize_image
-import modules.shared as shared
-import numpy as np
-import torch
 from PIL import Image, ImageFilter
 
 
