@@ -15,6 +15,3 @@ Available nodes:
 ```
 image > upscaling > UltimateSDUpscale
 ```
-
-## Todo
-- Add the seam fixes.
