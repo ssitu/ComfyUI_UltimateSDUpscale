@@ -70,9 +70,13 @@ class UltimateSDUpscale:
 
         # Processing
         sdprocessing = StableDiffusionProcessing(tensor_to_pil(image),
-                                                model, positive, negative, vae,
-                                                seed, steps, cfg, sampler_name,
-                                                scheduler, denoise)
+                                                 model, positive, negative, vae,
+                                                 seed, steps, cfg, sampler_name,
+                                                 scheduler, denoise)
+
+        # Test
+        from modules.processing import test_save
+        test_save(tensor_to_pil(image), "init")
 
         #
         # Running the script
@@ -85,7 +89,7 @@ class UltimateSDUpscale:
                                custom_height=None, custom_scale=upscale_by)
 
         # Return the resulting image
-        upscaled_image = pil_to_tensor(shared.tiled_image)
+        upscaled_image = pil_to_tensor(processed.images[0])
         return (upscaled_image,)
 
 
