@@ -1,6 +1,6 @@
 # Patched classes to adapt from A111 webui for ComfyUI
 from nodes import common_ksampler, VAEEncode, VAEDecode
-from utils import pil_to_tensor, tensor_to_pil, get_mask_region, expand_crop_region, resize_image
+from utils import pil_to_tensor, tensor_to_pil, get_mask_region, expand_crop_region, resize_image, expand
 from PIL import Image, ImageFilter
 
 
@@ -59,12 +59,14 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 
     # Locate the white region of the mask outlining the tile and add padding
     crop_region = get_mask_region(image_mask, p.inpaint_full_res_padding)
-    crop_region = expand_crop_region(crop_region, p.width, p.height, image_mask.width, image_mask.height)
+    # crop_region = expand_crop_region(crop_region, p.width, p.height, image_mask.width, image_mask.height)
+    crop_region, (p.width, p.height) = expand(crop_region, image_mask.width, image_mask.height)
 
     # Crop the init_image to get the tile that will be used for generation
     tile = init_image.crop(crop_region)
     initial_tile_size = tile.size
-    tile = resize_image(tile, p.width, p.height)
+    # tile = resize_image(tile, p.width, p.height)
+    # tile = tile.resize((p.width, p.height), Image.Resampling.LANCZOS)
 
     # Encode the image
     vae_encoder = VAEEncode()
@@ -82,7 +84,8 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     tile_sampled = tensor_to_pil(decoded)
 
     # Resize back to the original size
-    tile_sampled = resize_image(tile_sampled, initial_tile_size[0], initial_tile_size[1])
+    # tile_sampled = resize_image(tile_sampled, initial_tile_size[0], initial_tile_size[1])
+    # tile_sampled = tile_sampled.resize(initial_tile_size, Image.Resampling.LANCZOS)
 
     # Put the tile into position
     image_tile_only = Image.new('RGB', init_image.size)
@@ -94,7 +97,5 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     # Add back the tile to the initial image according to the mask in the alpha channel
     result = init_image.convert('RGBA')
     result.alpha_composite(image_tile_only)
-
-    # Return the original image instead of the generated image because the masked parts of the image are noised
     processed = Processed(p, [result], p.seed, None)
     return processed
