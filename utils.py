@@ -15,8 +15,34 @@ def pil_to_tensor(img):
     # Takes a 3 channel PIL image and returns a tensor of shape [1, height, width, 3]
     image = img.convert("RGB")
     image = np.array(image).astype(np.float32) / 255.0
-    image = torch.from_numpy(image)[None,]
+    image = torch.from_numpy(image)[None, ]
     return image
+
+
+def controlnet_hint_to_pil(tensor):
+    return tensor_to_pil(tensor.movedim(1, -1))
+
+
+def pil_to_controlnet_hint(img):
+    return pil_to_tensor(img).movedim(-1, 1)
+
+
+def crop_cond(cond, region, p_size, image_size):
+    cropped = []
+    for emb, x in cond:
+        n = [emb, x.copy()]
+        if "control" in n[1]:
+            cnet = n[1]["control"]
+            im = controlnet_hint_to_pil(cnet.cond_hint_original)
+            init_size = im.size
+            im = im.resize(image_size, Image.Resampling.NEAREST)
+            im = im.crop(region)
+            im = im.resize(init_size, Image.Resampling.NEAREST)
+            if p_size != im.size:
+                im = im.resize(p_size, Image.Resampling.LANCZOS)
+            cnet.cond_hint = pil_to_controlnet_hint(im).to(cnet.device)
+        cropped.append(n)
+    return cropped
 
 
 def get_mask_region(mask, pad=0):
@@ -33,6 +59,38 @@ def get_mask_region(mask, pad=0):
         int(min(x2 + pad, mask.width)),
         int(min(y2 + pad, mask.height))
     )
+
+
+def expand(region, width, height):
+    # Expand the crop region to a multiple of 8 for encoding
+    x1, y1, x2, y2 = region
+    actual_width = x2 - x1
+    actual_height = y2 - y1
+    p_width = math.ceil(actual_width/8)*8
+    p_height = math.ceil(actual_height/8)*8
+
+    # Try to expand region to the right of half the difference
+    width_diff = p_width - actual_width
+    x2 = min(x2 + width_diff//2, width)
+    # Expand region to the left of the difference including the pixels that could not be expanded to the right
+    width_diff = p_width - (x2 - x1)
+    x1 = max(x1 - width_diff, 0)
+    # Try the right again
+    width_diff = p_width - (x2 - x1)
+    x2 = min(x2 + width_diff, width)
+
+    # Try to expand region to the bottom of half the difference
+    height_diff = p_height - actual_height
+    y2 = min(y2 + height_diff//2, height)
+    # Expand region to the top of the difference including the pixels that could not be expanded to the bottom
+    height_diff = p_height - (y2 - y1)
+    y1 = max(y1 - height_diff, 0)
+    # Try the bottom again
+    height_diff = p_height - (y2 - y1)
+    y2 = min(y2 + height_diff, height)
+
+    # Width and height should be the same as p_width and p_height
+    return (x1, y1, x2, y2), (p_width, p_height)
 
 
 def expand_crop_region(crop_region, processing_width, processing_height, image_width, image_height):
@@ -76,36 +134,6 @@ def expand_crop_region(crop_region, processing_width, processing_height, image_w
 
     return x1, y1, x2, y2
 
-def expand(region, width, height):
-    # Expand the crop region to a multiple of 8 for encoding
-    x1, y1, x2, y2 = region
-    actual_width = x2 - x1
-    actual_height = y2 - y1
-    p_width = math.ceil(actual_width/8)*8
-    p_height = math.ceil(actual_height/8)*8
-
-    # Try to expand region to the right of half the difference
-    width_diff = p_width - actual_width
-    x2 = min(x2 + width_diff//2, width)
-    # Expand region to the left of the difference including the pixels that could not be expanded to the right
-    width_diff = p_width - (x2 - x1)
-    x1 = max(x1 - width_diff, 0)
-    # Try the right again
-    width_diff = p_width - (x2 - x1)
-    x2 = min(x2 + width_diff, width)
-
-    # Try to expand region to the bottom of half the difference
-    height_diff = p_height - actual_height
-    y2 = min(y2 + height_diff//2, height)
-    # Expand region to the top of the difference including the pixels that could not be expanded to the bottom
-    height_diff = p_height - (y2 - y1)
-    y1 = max(y1 - height_diff, 0)
-    # Try the bottom again
-    height_diff = p_height - (y2 - y1)
-    y2 = min(y2 + height_diff, height)
-
-    # Width and height should be the same as p_width and p_height
-    return (x1, y1, x2, y2), (p_width, p_height)
 
 def resize_image(im, width, height):
     # From https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/master/modules/images.py
