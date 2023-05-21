@@ -1,6 +1,6 @@
 # Patched classes to adapt from A111 webui for ComfyUI
 from nodes import common_ksampler, VAEEncode, VAEDecode
-from utils import pil_to_tensor, tensor_to_pil, get_mask_region, expand_crop_region, resize_image, expand, crop_cond
+from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond
 from PIL import Image, ImageFilter
 
 
@@ -58,14 +58,12 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
         image_mask = image_mask.filter(ImageFilter.GaussianBlur(p.mask_blur))
 
     # Locate the white region of the mask outlining the tile and add padding
-    crop_region = get_mask_region(image_mask, p.inpaint_full_res_padding)
-    # crop_region = expand_crop_region(crop_region, p.width, p.height, image_mask.width, image_mask.height)
-    crop_region, (p.width, p.height) = expand(crop_region, image_mask.width, image_mask.height)
+    crop_region = get_crop_region(image_mask, p.inpaint_full_res_padding)
+    crop_region, (p.width, p.height) = expand_crop(crop_region, image_mask.width, image_mask.height)
 
     # Crop the init_image to get the tile that will be used for generation
     tile = init_image.crop(crop_region)
     initial_tile_size = tile.size
-    # tile = resize_image(tile, p.width, p.height)
     if tile.size != (p.width, p.height):
         tile = tile.resize((p.width, p.height), Image.Resampling.LANCZOS)
 
@@ -89,7 +87,6 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     tile_sampled = tensor_to_pil(decoded)
 
     # Resize back to the original size
-    # tile_sampled = resize_image(tile_sampled, initial_tile_size[0], initial_tile_size[1])
     if tile.size != (p.width, p.height):
         tile_sampled = tile_sampled.resize(initial_tile_size, Image.Resampling.LANCZOS)
 
