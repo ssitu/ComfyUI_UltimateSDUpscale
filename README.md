@@ -15,3 +15,6 @@ Available nodes:
 ```
 image > upscaling > UltimateSDUpscale
 ```
+## Examples
+#### Using the ControlNet tile model:
+![image](https://github.com/ssitu/ComfyUI_UltimateSDUpscale/assets/57548627/64f8d3b2-10ae-45ee-9f8a-40b798a51655)
