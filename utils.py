@@ -75,8 +75,8 @@ def expand_crop(region, width, height):
     return (x1, y1, x2, y2), (p_width, p_height)
 
 
-def resize_crop(region, init_size, resize_size):
-    # Resize a crop region so that it fits an image that was resized to the given width and height
+def resize_region(region, init_size, resize_size):
+    # Resize a crop so that it fits an image that was resized to the given width and height
     x1, y1, x2, y2 = region
     init_width, init_height = init_size
     resize_width, resize_height = resize_size
@@ -87,16 +87,53 @@ def resize_crop(region, init_size, resize_size):
     return (x1, y1, x2, y2)
 
 
-def crop_cond(cond, region, p_size, image_size):
+def crop_controlnet(controlnet, region, canvas_size, tile_size):
+    im = controlnet_hint_to_pil(controlnet.cond_hint_original)
+    resized_crop = resize_region(region, canvas_size, im.size)
+    im = im.crop(resized_crop)
+    im = im.resize(tile_size, Image.Resampling.NEAREST)
+    controlnet.cond_hint = pil_to_controlnet_hint(im).to(controlnet.device)
+
+
+def crop_gligen(gligen, region, init_size, canvas_size):
+    type, model, cond = gligen
+    for i, c in enumerate(cond):
+        emb, h, w, y, x = c
+        if type == "position":
+            x1 = x * 8
+            y1 = y * 8
+            x2 = x1 + w * 8
+            y2 = y1 + h * 8
+            x1, y1, x2, y2 = resize_region((x1, y1, x2, y2), init_size, canvas_size)
+
+            # Calculate the intersection of the gligen box and the region
+            x1_, y1_, x2_, y2_ = region
+            x1 = max(x1, x1_)
+            y1 = max(y1, y1_)
+            x2 = min(x2, x2_)
+            y2 = min(y2, y2_)
+
+            # Set the new position params
+            h = (y2 - y1) // 8
+            w = (x2 - x1) // 8
+            x = x1 // 8
+            y = y1 // 8
+            cond[i] = (emb, h, w, y, x)
+
+        else:
+            from warnings import warn
+            warn(f"Cropping of gligen method of type \"{type}\" is not implemented yet")
+
+
+def crop_cond(cond, region, init_size, canvas_size, tile_size):
     cropped = []
     for emb, x in cond:
         n = [emb, x.copy()]
         if "control" in n[1]:
             cnet = n[1]["control"]
-            im = controlnet_hint_to_pil(cnet.cond_hint_original)
-            resized_crop = resize_crop(region, image_size, im.size)
-            im = im.crop(resized_crop)
-            im = im.resize(p_size, Image.Resampling.NEAREST)
-            cnet.cond_hint = pil_to_controlnet_hint(im).to(cnet.device)
+            crop_controlnet(cnet, region, canvas_size, tile_size)
+        if "gligen" in n[1]:
+            gligen = n[1]["gligen"]
+            crop_gligen(gligen, region, init_size, canvas_size)
         cropped.append(n)
     return cropped

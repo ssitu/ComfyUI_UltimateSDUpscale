@@ -7,13 +7,13 @@ from PIL import Image, ImageFilter
 class StableDiffusionProcessing:
 
     def __init__(self, init_img, model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise):
-        # Variables used by the upscaler script
+        # Variables used by the USDU script
         self.init_images = [init_img]
         self.image_mask = None
         self.mask_blur = 0
         self.inpaint_full_res_padding = 0
-        self.width = 0
-        self.height = 0
+        self.width = init_img.width
+        self.height = init_img.height
 
         # ComfyUI Sampler inputs
         self.model = model
@@ -27,7 +27,10 @@ class StableDiffusionProcessing:
         self.scheduler = scheduler
         self.denoise = denoise
 
-        # Other required A1111 variables for the upscaler script that is currently unused in this script
+        # Variables used only by this script
+        self.init_size = init_img.width, init_img.height
+
+        # Other required A1111 variables for the USDU script that is currently unused in this script
         self.extra_generation_params = {}
 
 
@@ -68,8 +71,8 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
         tile = tile.resize((p.width, p.height), Image.Resampling.LANCZOS)
 
     # Crop conditioning
-    positive_cropped = crop_cond(p.positive, crop_region, (p.width, p.height), init_image.size)
-    negative_cropped = crop_cond(p.negative, crop_region, (p.width, p.height), init_image.size)
+    positive_cropped = crop_cond(p.positive, crop_region, p.init_size, init_image.size, (p.width, p.height))
+    negative_cropped = crop_cond(p.negative, crop_region, p.init_size, init_image.size, (p.width, p.height))
 
     # Encode the image
     vae_encoder = VAEEncode()
