@@ -94,7 +94,7 @@ def crop_controlnet(controlnet, region, canvas_size, tile_size):
     resized_crop = resize_region(region, canvas_size, im.size)
     im = im.crop(resized_crop)
     im = im.resize(tile_size, Image.Resampling.NEAREST)
-    if controlnet.channels_in == 1: # For t2i adapter
+    if hasattr(controlnet, "channels_in") and controlnet.channels_in == 1: # For t2i adapter
         im = im.convert("L")
     hint = pil_to_controlnet_hint(im)
     controlnet.cond_hint = hint.to(controlnet.device)
