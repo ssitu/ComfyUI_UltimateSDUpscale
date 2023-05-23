@@ -5,17 +5,19 @@ import math
 
 
 def tensor_to_pil(img_tensor):
-    # Takes a batch of 1 rgb image and returns an RGB PIL image
+    # Takes a batch of 1 image in the form of a tensor of shape [1, channels, height, width] 
+    # and returns an PIL Image with the corresponding mode deduced by the number of channels
     i = 255. * img_tensor.cpu().numpy()
     img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8).squeeze())
     return img
 
 
-def pil_to_tensor(img):
-    # Takes a 3 channel PIL image and returns a tensor of shape [1, height, width, 3]
-    image = img.convert("RGB")
+def pil_to_tensor(image):
+    # Takes a PIL image and returns a tensor of shape [1, height, width, channels]
     image = np.array(image).astype(np.float32) / 255.0
-    image = torch.from_numpy(image)[None, ]
+    image = torch.from_numpy(image).unsqueeze(0)
+    if len(image.shape) == 3:  # If the image is grayscale, add a channel dimension
+        image = image.unsqueeze(-1)
     return image
 
 
@@ -92,7 +94,10 @@ def crop_controlnet(controlnet, region, canvas_size, tile_size):
     resized_crop = resize_region(region, canvas_size, im.size)
     im = im.crop(resized_crop)
     im = im.resize(tile_size, Image.Resampling.NEAREST)
-    controlnet.cond_hint = pil_to_controlnet_hint(im).to(controlnet.device)
+    if controlnet.channels_in == 1: # For t2i adapter
+        im = im.convert("L")
+    hint = pil_to_controlnet_hint(im)
+    controlnet.cond_hint = hint.to(controlnet.device)
 
 
 def crop_gligen(gligen, region, init_size, canvas_size):
