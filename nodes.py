@@ -52,13 +52,13 @@ class UltimateSDUpscale:
                 "tile_width": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
                 "tile_height": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
                 "mask_blur": ("INT", {"default": 8, "min": 0, "max": 64, "step": 1}),
-                "tile_padding": ("INT", {"default": 32, "min": 0, "max": 128, "step": 1}),
+                "tile_padding": ("INT", {"default": 32, "min": 0, "max": 128, "step": 8}),
                 # Seam fix params
                 "seam_fix_mode": (list(SEAM_FIX_MODES.keys()),),
                 "seam_fix_denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "seam_fix_width": ("INT", {"default": 64, "min": 0, "max": 128, "step": 1}),
+                "seam_fix_width": ("INT", {"default": 64, "min": 0, "max": 128, "step": 8}),
                 "seam_fix_mask_blur": ("INT", {"default": 8, "min": 0, "max": 64, "step": 1}),
-                "seam_fix_padding": ("INT", {"default": 16, "min": 0, "max": 128, "step": 1}),
+                "seam_fix_padding": ("INT", {"default": 16, "min": 0, "max": 128, "step": 8}),
             }
         }
 
