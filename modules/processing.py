@@ -94,14 +94,18 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
         tile_sampled = tile_sampled.resize(initial_tile_size, Image.Resampling.LANCZOS)
 
     # Put the tile into position
-    image_tile_only = Image.new('RGB', init_image.size)
+    image_tile_only = Image.new('RGBA', init_image.size)
     image_tile_only.paste(tile_sampled, crop_region[:2])
 
     # Add the mask as an alpha channel
-    image_tile_only.putalpha(image_mask)
+    # Must make a copy due to the possibility of an edge becoming black
+    temp = image_tile_only.copy()
+    temp.putalpha(image_mask)
+    image_tile_only.paste(temp, image_tile_only)
 
     # Add back the tile to the initial image according to the mask in the alpha channel
     result = init_image.convert('RGBA')
     result.alpha_composite(image_tile_only)
+
     processed = Processed(p, [result], p.seed, None)
     return processed

@@ -5,7 +5,7 @@ import math
 
 
 def tensor_to_pil(img_tensor):
-    # Takes a batch of 1 image in the form of a tensor of shape [1, channels, height, width] 
+    # Takes a batch of 1 image in the form of a tensor of shape [1, channels, height, width]
     # and returns an PIL Image with the corresponding mode deduced by the number of channels
     i = 255. * img_tensor.cpu().numpy()
     img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8).squeeze())
@@ -37,12 +37,23 @@ def get_crop_region(mask, pad=0):
         x1, y1, x2, y2 = coordinates
     else:
         x1, y1, x2, y2 = mask.width, mask.height, 0, 0
-    return (
-        int(max(x1 - pad, 0)),
-        int(max(y1 - pad, 0)),
-        int(min(x2 + pad, mask.width)),
-        int(min(y2 + pad, mask.height))
-    )
+    # Apply padding
+    x1 = max(x1 - pad, 0)
+    y1 = max(y1 - pad, 0)
+    x2 = min(x2 + pad, mask.width)
+    y2 = min(y2 + pad, mask.height)
+    return fix_crop_region((x1, y1, x2, y2), (mask.width, mask.height))
+
+
+def fix_crop_region(region, image_size):
+    # Remove the extra pixel added by the get_crop_region function
+    image_width, image_height = image_size
+    x1, y1, x2, y2 = region
+    if x2 < image_width:
+        x2 -= 1
+    if y2 < image_height:
+        y2 -= 1
+    return x1, y1, x2, y2
 
 
 def expand_crop(region, width, height):
@@ -94,7 +105,7 @@ def crop_controlnet(controlnet, region, canvas_size, tile_size):
     resized_crop = resize_region(region, canvas_size, im.size)
     im = im.crop(resized_crop)
     im = im.resize(tile_size, Image.Resampling.NEAREST)
-    if hasattr(controlnet, "channels_in") and controlnet.channels_in == 1: # For t2i adapter
+    if hasattr(controlnet, "channels_in") and controlnet.channels_in == 1:  # For t2i adapter
         im = im.convert("L")
     hint = pil_to_controlnet_hint(im)
     controlnet.cond_hint = hint.to(controlnet.device)
