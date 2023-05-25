@@ -100,7 +100,10 @@ def resize_region(region, init_size, resize_size):
     return (x1, y1, x2, y2)
 
 
-def crop_controlnet(controlnet, region, canvas_size, tile_size):
+def crop_controlnet(cond_dict, region, init_size, canvas_size, tile_size):
+    if "control" not in cond_dict:
+        return
+    controlnet = cond_dict["control"]
     im = controlnet_hint_to_pil(controlnet.cond_hint_original)
     resized_crop = resize_region(region, canvas_size, im.size)
     im = im.crop(resized_crop)
@@ -111,45 +114,124 @@ def crop_controlnet(controlnet, region, canvas_size, tile_size):
     controlnet.cond_hint = hint.to(controlnet.device)
 
 
-def crop_gligen(gligen, region, init_size, canvas_size):
-    type, model, cond = gligen
-    for i, c in enumerate(cond):
+def region_intersection(region1, region2):
+    """
+    Returns the coordinates of the intersection of two rectangular regions.
+    :param region1: A tuple of the form (x1, y1, x2, y2) denoting the upper left and the lower right points 
+        of the first rectangular region. Expected to have x2 > x1 and y2 > y1.
+    :param region2: The second rectangular region with the same format as the first.
+    :return: A tuple of the form (x1, y1, x2, y2) denoting the rectangular intersection. 
+        None if there is no intersection.
+    """
+    x1, y1, x2, y2 = region1
+    x1_, y1_, x2_, y2_ = region2
+    x1 = max(x1, x1_)
+    y1 = max(y1, y1_)
+    x2 = min(x2, x2_)
+    y2 = min(y2, y2_)
+    if x1 >= x2 or y1 >= y2:
+        return None
+    return (x1, y1, x2, y2)
+
+
+def crop_gligen(cond_dict, region, init_size, canvas_size, tile_size):
+    if "gligen" not in cond_dict:
+        return
+    type, model, cond = cond_dict["gligen"]
+    if type != "position":
+        from warnings import warn
+        warn(f"Unknown gligen type {type}")
+        return
+    cropped = []
+    for c in cond:
         emb, h, w, y, x = c
-        if type == "position":
-            x1 = x * 8
-            y1 = y * 8
-            x2 = x1 + w * 8
-            y2 = y1 + h * 8
-            x1, y1, x2, y2 = resize_region((x1, y1, x2, y2), init_size, canvas_size)
+        # Get the coordinates of the box in the upscaled image
+        x1 = x * 8
+        y1 = y * 8
+        x2 = x1 + w * 8
+        y2 = y1 + h * 8
+        gligen_upscaled_box = resize_region((x1, y1, x2, y2), init_size, canvas_size)
 
-            # Calculate the intersection of the gligen box and the region
-            x1_, y1_, x2_, y2_ = region
-            x1 = max(x1, x1_)
-            y1 = max(y1, y1_)
-            x2 = min(x2, x2_)
-            y2 = min(y2, y2_)
+        # Calculate the intersection of the gligen box and the region
+        intersection = region_intersection(gligen_upscaled_box, region)
+        if intersection is None:
+            continue
+        x1, y1, x2, y2 = intersection
 
-            # Set the new position params
-            h = (y2 - y1) // 8
-            w = (x2 - x1) // 8
-            x = x1 // 8
-            y = y1 // 8
-            cond[i] = (emb, h, w, y, x)
+        # Offset the gligen box so that the origin is at the top left of the tile region
+        x1 -= region[0]
+        y1 -= region[1]
+        x2 -= region[0]
+        y2 -= region[1]
 
-        else:
-            from warnings import warn
-            warn(f"Cropping of gligen method of type \"{type}\" is not implemented yet")
+        # Set the new position params
+        h = (y2 - y1) // 8
+        w = (x2 - x1) // 8
+        x = x1 // 8
+        y = y1 // 8
+        cropped.append((emb, h, w, y, x))
+    cond_dict["gligen"] = (type, model, cropped)
+
+
+def crop_area(cond_dict, region, init_size, canvas_size, tile_size):
+    if "area" not in cond_dict:
+        return
+    # Resize the area conditioning to the canvas size and confine it to the tile region
+    h, w, y, x = cond_dict["area"]
+    w, h, x, y = 8 * w, 8 * h, 8 * x, 8 * y
+    x1, y1, x2, y2 = resize_region((x, y, x + w, y + h), init_size, canvas_size)
+    intersection = region_intersection((x1, y1, x2, y2), region)
+    if intersection is None:
+        del cond_dict["area"]
+        del cond_dict["strength"]
+        return
+    x1, y1, x2, y2 = intersection
+    # Offset origin to the top left of the tile
+    x1 -= region[0]
+    y1 -= region[1]
+    x2 -= region[0]
+    y2 -= region[1]
+    # Set the params for tile
+    w, h = (x2 - x1) // 8, (y2 - y1) // 8
+    x, y = x1 // 8, y1 // 8
+    cond_dict["area"] = (h, w, y, x)
+
+
+def crop_mask(cond_dict, region, init_size, canvas_size, tile_size):
+    if "mask" not in cond_dict:
+        return
+    mask = cond_dict["mask"]  # (1, H, W)
+    # Convert to PIL image
+    mask = tensor_to_pil(mask)  # W x H
+    # Resize the mask to the canvas size
+    mask = mask.resize(canvas_size, Image.Resampling.BICUBIC)
+    # Crop the mask to the region
+    mask = mask.crop(region)
+    # Resize the mask to the tile size
+    if tile_size != mask.size:
+        mask = mask.resize(tile_size, Image.Resampling.BICUBIC)
+    # Remove mask if it is all white
+    mask_bbox = mask.getbbox()
+    if mask_bbox is not None:
+        # Check if mask is completely contains the tile
+        if region_intersection(region, mask_bbox) == region:
+            del cond_dict["mask"]
+            del cond_dict["mask_strength"]
+            return
+    # Convert back to tensor
+    mask = pil_to_tensor(mask)  # (1, H, W, 1)
+    mask = mask.squeeze(-1)  # (1, H, W)
+    cond_dict["mask"] = mask
 
 
 def crop_cond(cond, region, init_size, canvas_size, tile_size):
     cropped = []
     for emb, x in cond:
-        n = [emb, x.copy()]
-        if "control" in n[1]:
-            cnet = n[1]["control"]
-            crop_controlnet(cnet, region, canvas_size, tile_size)
-        if "gligen" in n[1]:
-            gligen = n[1]["gligen"]
-            crop_gligen(gligen, region, init_size, canvas_size)
+        cond_dict = x.copy()
+        n = [emb, cond_dict]
+        crop_controlnet(cond_dict, region, init_size, canvas_size, tile_size)
+        crop_gligen(cond_dict, region, init_size, canvas_size, tile_size)
+        crop_area(cond_dict, region, init_size, canvas_size, tile_size)
+        crop_mask(cond_dict, region, init_size, canvas_size, tile_size)
         cropped.append(n)
     return cropped
