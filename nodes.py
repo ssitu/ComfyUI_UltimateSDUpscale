@@ -49,8 +49,8 @@ class UltimateSDUpscale:
                 # Upscale Params
                 "upscale_model": ("UPSCALE_MODEL",),
                 "mode_type": (list(MODES.keys()),),
-                "tile_width": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
-                "tile_height": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 64}),
+                "tile_width": ("INT", {"default": 512, "min": 8, "max": MAX_RESOLUTION, "step": 8}),
+                "tile_height": ("INT", {"default": 512, "min": 8, "max": MAX_RESOLUTION, "step": 8}),
                 "mask_blur": ("INT", {"default": 8, "min": 0, "max": 64, "step": 1}),
                 "tile_padding": ("INT", {"default": 32, "min": 0, "max": 128, "step": 8}),
                 # Seam fix params
@@ -82,10 +82,9 @@ class UltimateSDUpscale:
         shared.actual_upscaler = upscale_model
 
         # Processing
-        sdprocessing = StableDiffusionProcessing(tensor_to_pil(image),
-                                                 model, positive, negative, vae,
-                                                 seed, steps, cfg, sampler_name,
-                                                 scheduler, denoise)
+        sdprocessing = StableDiffusionProcessing(
+            tensor_to_pil(image), model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise
+        )
 
         #
         # Running the script
