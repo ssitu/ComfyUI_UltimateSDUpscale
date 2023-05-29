@@ -13,6 +13,7 @@ Available nodes:
 ```
 image > upscaling > UltimateSDUpscale
 ```
+Details about the parameters can be found [here](https://github.com/Coyote-A/ultimate-upscale-for-automatic1111/wiki/FAQ#parameters-descriptions).
 ## Examples
 #### Using the ControlNet tile model:
 ![image](https://github.com/ssitu/ComfyUI_UltimateSDUpscale/assets/57548627/64f8d3b2-10ae-45ee-9f8a-40b798a51655)
