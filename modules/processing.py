@@ -110,5 +110,8 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     result = init_image.convert('RGBA')
     result.alpha_composite(image_tile_only)
 
+    # Convert back to RGB
+    result = result.convert('RGB')
+
     processed = Processed(p, [result], p.seed, None)
     return processed
