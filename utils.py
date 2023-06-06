@@ -3,6 +3,9 @@ from PIL import Image
 import torch
 import math
 
+if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
+    Image.Resampling = Image
+
 
 def tensor_to_pil(img_tensor):
     # Takes a batch of 1 image in the form of a tensor of shape [1, channels, height, width]

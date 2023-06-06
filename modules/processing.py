@@ -3,6 +3,9 @@ from nodes import common_ksampler, VAEEncode, VAEDecode
 from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond
 from PIL import Image, ImageFilter
 
+if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
+    Image.Resampling = Image
+
 
 class StableDiffusionProcessing:
 
