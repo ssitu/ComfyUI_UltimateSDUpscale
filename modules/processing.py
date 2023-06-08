@@ -1,4 +1,4 @@
-# Patched classes to adapt from A111 webui for ComfyUI
+# Patched classes to adapt from A1111 webui for ComfyUI
 from nodes import common_ksampler, VAEEncode, VAEDecode
 from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond
 from PIL import Image, ImageFilter
