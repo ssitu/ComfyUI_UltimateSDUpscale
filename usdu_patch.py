@@ -23,11 +23,10 @@ usdu.USDUpscaler.__init__ = new_init
 old_setup_redraw = usdu.USDURedraw.init_draw
 
 
-def new_setup_redraw(self, p, width, height):
-    mask, draw = old_setup_redraw(self, p, width, height)
+def new_setup_redraw(self, p):
+    old_setup_redraw(self, p)
     p.width = math.ceil((self.tile_width + self.padding) / 8) * 8
     p.height = math.ceil((self.tile_height + self.padding) / 8) * 8
-    return mask, draw
 
 
 usdu.USDURedraw.init_draw = new_setup_redraw
