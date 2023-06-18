@@ -9,7 +9,7 @@ if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
 
 class StableDiffusionProcessing:
 
-    def __init__(self, init_img, model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise):
+    def __init__(self, init_img, model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by=1):
         # Variables used by the USDU script
         self.init_images = [init_img]
         self.image_mask = None
@@ -32,6 +32,7 @@ class StableDiffusionProcessing:
 
         # Variables used only by this script
         self.init_size = init_img.width, init_img.height
+        self.upscale_by = upscale_by
 
         # Other required A1111 variables for the USDU script that is currently unused in this script
         self.extra_generation_params = {}

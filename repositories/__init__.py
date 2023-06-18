@@ -1,4 +1,5 @@
-import os, sys
+import os
+import sys
 import importlib.util
 
 repos_path = os.path.dirname(os.path.realpath(__file__))
@@ -7,7 +8,6 @@ repos_path = os.path.dirname(os.path.realpath(__file__))
 root_path = os.path.dirname(repos_path)
 sys.path.insert(0, root_path)
 
-# https://github.com/Coyote-A/ultimate-upscale-for-automatic1111
 # Import the script
 script_name = "scripts/ultimate-upscale"
 repo_name = "ultimate_sd_upscale"

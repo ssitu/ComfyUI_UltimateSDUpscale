@@ -3,7 +3,7 @@
 import os
 import sys
 import comfy
-from .repositories import ultimate_upscale as ult
+from .usdu_patch import usdu
 from .utils import tensor_to_pil, pil_to_tensor
 from modules.processing import StableDiffusionProcessing
 import modules.shared as shared
@@ -13,16 +13,16 @@ from modules.upscaler import UpscalerData
 MAX_RESOLUTION = 8192
 # The modes available for Ultimate SD Upscale
 MODES = {
-    "Linear": ult.USDUMode.LINEAR,
-    "Chess": ult.USDUMode.CHESS,
-    "None": ult.USDUMode.NONE,
+    "Linear": usdu.USDUMode.LINEAR,
+    "Chess": usdu.USDUMode.CHESS,
+    "None": usdu.USDUMode.NONE,
 }
 # The seam fix modes
 SEAM_FIX_MODES = {
-    "None": ult.USDUSFMode.NONE,
-    "Band Pass": ult.USDUSFMode.BAND_PASS,
-    "Half Tile": ult.USDUSFMode.HALF_TILE,
-    "Half Tile + Intersections": ult.USDUSFMode.HALF_TILE_PLUS_INTERSECTIONS,
+    "None": usdu.USDUSFMode.NONE,
+    "Band Pass": usdu.USDUSFMode.BAND_PASS,
+    "Half Tile": usdu.USDUSFMode.HALF_TILE,
+    "Half Tile + Intersections": usdu.USDUSFMode.HALF_TILE_PLUS_INTERSECTIONS,
 }
 
 
@@ -110,13 +110,14 @@ class UltimateSDUpscale:
 
         # Processing
         sdprocessing = StableDiffusionProcessing(
-            tensor_to_pil(image), model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise
+            tensor_to_pil(image), model, positive, negative, vae,
+            seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by
         )
 
         #
         # Running the script
         #
-        script = ult.Script()
+        script = usdu.Script()
         processed = script.run(p=sdprocessing, _=None, tile_width=tile_width, tile_height=tile_height,
                                mask_blur=mask_blur, padding=tile_padding, seams_fix_width=seam_fix_width,
                                seams_fix_denoise=seam_fix_denoise, seams_fix_padding=seam_fix_padding,
@@ -148,14 +149,15 @@ class UltimateSDUpscaleNoUpscale:
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
                 seam_fix_width, seam_fix_padding):
-        
+
         shared.sd_upscalers[0] = UpscalerData()
         shared.actual_upscaler = None
         sdprocessing = StableDiffusionProcessing(
-            tensor_to_pil(upscaled_image), model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise
+            tensor_to_pil(upscaled_image), model, positive, negative, vae,
+            seed, steps, cfg, sampler_name, scheduler, denoise
         )
 
-        script = ult.Script()
+        script = usdu.Script()
         processed = script.run(p=sdprocessing, _=None, tile_width=tile_width, tile_height=tile_height,
                                mask_blur=mask_blur, padding=tile_padding, seams_fix_width=seam_fix_width,
                                seams_fix_denoise=seam_fix_denoise, seams_fix_padding=seam_fix_padding,
