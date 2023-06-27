@@ -19,3 +19,6 @@ state = State()
 sd_upscalers = [None]
 # The upscaler usable by ComfyUI nodes
 actual_upscaler = None
+
+# Batch of images to upscale
+batch = None

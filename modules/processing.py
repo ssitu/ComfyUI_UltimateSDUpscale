@@ -1,7 +1,8 @@
-# Patched classes to adapt from A1111 webui for ComfyUI
+from PIL import Image, ImageFilter
+import torch
 from nodes import common_ksampler, VAEEncode, VAEDecode
 from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond
-from PIL import Image, ImageFilter
+from modules import shared
 
 if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
     Image.Resampling = Image
@@ -68,11 +69,12 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     crop_region = get_crop_region(image_mask, p.inpaint_full_res_padding)
     crop_region, (p.width, p.height) = expand_crop(crop_region, image_mask.width, image_mask.height)
 
-    # Crop the init_image to get the tile that will be used for generation
-    tile = init_image.crop(crop_region)
-    initial_tile_size = tile.size
-    if tile.size != (p.width, p.height):
-        tile = tile.resize((p.width, p.height), Image.Resampling.LANCZOS)
+    # Crop the images to get the tiles that will be used for generation
+    tiles = [img.crop(crop_region) for img in shared.batch]
+    initial_tile_size = tiles[0].size
+    for i in range(len(tiles)):
+        if tiles[i].size != (p.width, p.height):
+            tiles[i] = tiles[i].resize((p.width, p.height), Image.Resampling.LANCZOS)
 
     # Crop conditioning
     positive_cropped = crop_cond(p.positive, crop_region, p.init_size, init_image.size, (p.width, p.height))
@@ -80,7 +82,8 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 
     # Encode the image
     vae_encoder = VAEEncode()
-    (latent,) = vae_encoder.encode(p.vae, pil_to_tensor(tile))
+    batched_tiles = torch.cat([pil_to_tensor(tile) for tile in tiles], dim=0)
+    (latent,) = vae_encoder.encode(p.vae, batched_tiles)
 
     # Generate samples
     (samples,) = common_ksampler(p.model, p.seed, p.steps, p.cfg, p.sampler_name,
@@ -91,28 +94,33 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     (decoded,) = vae_decoder.decode(p.vae, samples)
 
     # Convert the sample to a PIL image
-    tile_sampled = tensor_to_pil(decoded)
+    tiles_sampled = [tensor_to_pil(decoded, i) for i in range(len(decoded))]
 
-    # Resize back to the original size
-    if tile.size != (p.width, p.height):
-        tile_sampled = tile_sampled.resize(initial_tile_size, Image.Resampling.LANCZOS)
+    for i, tile_sampled in enumerate(tiles_sampled):
+        init_image = shared.batch[i]
 
-    # Put the tile into position
-    image_tile_only = Image.new('RGBA', init_image.size)
-    image_tile_only.paste(tile_sampled, crop_region[:2])
+        # Resize back to the original size
+        if tile_sampled.size != initial_tile_size:
+            tile_sampled = tile_sampled.resize(initial_tile_size, Image.Resampling.LANCZOS)
 
-    # Add the mask as an alpha channel
-    # Must make a copy due to the possibility of an edge becoming black
-    temp = image_tile_only.copy()
-    temp.putalpha(image_mask)
-    image_tile_only.paste(temp, image_tile_only)
+        # Put the tile into position
+        image_tile_only = Image.new('RGBA', init_image.size)
+        image_tile_only.paste(tile_sampled, crop_region[:2])
 
-    # Add back the tile to the initial image according to the mask in the alpha channel
-    result = init_image.convert('RGBA')
-    result.alpha_composite(image_tile_only)
+        # Add the mask as an alpha channel
+        # Must make a copy due to the possibility of an edge becoming black
+        temp = image_tile_only.copy()
+        temp.putalpha(image_mask)
+        image_tile_only.paste(temp, image_tile_only)
 
-    # Convert back to RGB
-    result = result.convert('RGB')
+        # Add back the tile to the initial image according to the mask in the alpha channel
+        result = init_image.convert('RGBA')
+        result.alpha_composite(image_tile_only)
 
-    processed = Processed(p, [result], p.seed, None)
+        # Convert back to RGB
+        result = result.convert('RGB')
+
+        shared.batch[i] = result
+
+    processed = Processed(p, [shared.batch[0]], p.seed, None)
     return processed

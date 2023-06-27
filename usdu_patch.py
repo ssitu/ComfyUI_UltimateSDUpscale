@@ -1,7 +1,12 @@
 # Make some patches to the script
-from .repositories import ultimate_upscale as usdu
+from repositories import ultimate_upscale as usdu
+import modules.shared as shared
 import math
+from PIL import Image
 
+
+if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
+    Image.Resampling = Image
 
 #
 # Instead of using multiples of 64, use multiples of 8
@@ -43,3 +48,19 @@ def new_setup_seams_fix(self, p):
 
 
 usdu.USDUSeamsFix.init_draw = new_setup_seams_fix
+
+
+#
+# Make the script upscale on a batch of images instead of one image
+#
+
+old_upscale = usdu.USDUpscaler.upscale
+
+
+def new_upscale(self):
+    old_upscale(self)
+    shared.batch = [self.image] + \
+        [img.resize((self.p.width, self.p.height), resample=Image.LANCZOS) for img in shared.batch[1:]]
+
+
+usdu.USDUpscaler.upscale = new_upscale

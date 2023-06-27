@@ -7,9 +7,12 @@ if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
     Image.Resampling = Image
 
 
-def tensor_to_pil(img_tensor):
-    # Takes a batch of 1 image in the form of a tensor of shape [1, channels, height, width]
+def tensor_to_pil(img_tensor, batch_index=0):
+    # Takes an image in a batch in the form of a tensor of shape [batch_size, channels, height, width]
     # and returns an PIL Image with the corresponding mode deduced by the number of channels
+
+    # Take the image in the batch given by batch_index
+    img_tensor = img_tensor[batch_index].unsqueeze(0)
     i = 255. * img_tensor.cpu().numpy()
     img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8).squeeze())
     return img
@@ -24,12 +27,24 @@ def pil_to_tensor(image):
     return image
 
 
-def controlnet_hint_to_pil(tensor):
-    return tensor_to_pil(tensor.movedim(1, -1))
+def controlnet_hint_to_pil(tensor, batch_index=0):
+    return tensor_to_pil(tensor.movedim(1, -1), batch_index)
 
 
 def pil_to_controlnet_hint(img):
     return pil_to_tensor(img).movedim(-1, 1)
+
+
+def crop_tensor(tensor, region):
+    # Takes a tensor of shape [batch_size, height, width, channels] and crops it to the given region
+    x1, y1, x2, y2 = region
+    return tensor[:, y1:y2, x1:x2, :]
+
+
+def resize_tensor(tensor, size, mode="nearest-exact"):
+    # Takes a tensor of shape [B, C, H, W] and resizes
+    # it to a shape of [B, C, size[0], size[1]] using the given mode
+    return torch.nn.functional.interpolate(tensor, size=size, mode=mode)
 
 
 def get_crop_region(mask, pad=0):
@@ -64,12 +79,12 @@ def expand_crop(region, width, height):
     x1, y1, x2, y2 = region
     actual_width = x2 - x1
     actual_height = y2 - y1
-    p_width = math.ceil(actual_width/8)*8
-    p_height = math.ceil(actual_height/8)*8
+    p_width = math.ceil(actual_width / 8) * 8
+    p_height = math.ceil(actual_height / 8) * 8
 
     # Try to expand region to the right of half the difference
     width_diff = p_width - actual_width
-    x2 = min(x2 + width_diff//2, width)
+    x2 = min(x2 + width_diff // 2, width)
     # Expand region to the left of the difference including the pixels that could not be expanded to the right
     width_diff = p_width - (x2 - x1)
     x1 = max(x1 - width_diff, 0)
@@ -79,7 +94,7 @@ def expand_crop(region, width, height):
 
     # Try to expand region to the bottom of half the difference
     height_diff = p_height - actual_height
-    y2 = min(y2 + height_diff//2, height)
+    y2 = min(y2 + height_diff // 2, height)
     # Expand region to the top of the difference including the pixels that could not be expanded to the bottom
     height_diff = p_height - (y2 - y1)
     y1 = max(y1 - height_diff, 0)
@@ -106,15 +121,20 @@ def resize_region(region, init_size, resize_size):
 def crop_controlnet(cond_dict, region, init_size, canvas_size, tile_size):
     if "control" not in cond_dict:
         return
-    controlnet = cond_dict["control"]
-    im = controlnet_hint_to_pil(controlnet.cond_hint_original)
-    resized_crop = resize_region(region, canvas_size, im.size)
-    im = im.crop(resized_crop)
-    im = im.resize(tile_size, Image.Resampling.NEAREST)
-    if hasattr(controlnet, "channels_in") and controlnet.channels_in == 1:  # For t2i adapter
-        im = im.convert("L")
-    hint = pil_to_controlnet_hint(im)
-    controlnet.cond_hint = hint.to(controlnet.device)
+    c = cond_dict["control"]
+    controlnet = c.copy()
+    cond_dict["control"] = controlnet
+    while c is not None:
+        # hint is shape (B, C, H, W)
+        hint = controlnet.cond_hint_original
+        resized_crop = resize_region(region, canvas_size, hint.shape[:-3:-1])
+        hint = crop_tensor(hint.movedim(1, -1), resized_crop).movedim(-1, 1)
+        hint = resize_tensor(hint, tile_size[::-1])
+        controlnet.cond_hint_original = hint
+
+        c = c.previous_controlnet
+        controlnet.set_previous_controlnet(c.copy() if c is not None else None)
+        controlnet = controlnet.previous_controlnet
 
 
 def region_intersection(region1, region2):

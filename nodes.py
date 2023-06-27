@@ -2,13 +2,14 @@
 
 import os
 import sys
+import torch
 import comfy
-from .usdu_patch import usdu
-from .utils import tensor_to_pil, pil_to_tensor
+sys.path.append(os.path.dirname(__file__))
+from usdu_patch import usdu
+from utils import tensor_to_pil, pil_to_tensor
 from modules.processing import StableDiffusionProcessing
 import modules.shared as shared
 from modules.upscaler import UpscalerData
-
 
 MAX_RESOLUTION = 8192
 # The modes available for Ultimate SD Upscale
@@ -108,6 +109,9 @@ class UltimateSDUpscale:
         # Where the actual upscaler is stored, will be used when the script upscales using the Upscaler in UpscalerData
         shared.actual_upscaler = upscale_model
 
+        # Set the batch of images
+        shared.batch = [tensor_to_pil(image, i) for i in range(len(image))]
+
         # Processing
         sdprocessing = StableDiffusionProcessing(
             tensor_to_pil(image), model, positive, negative, vae,
@@ -126,9 +130,10 @@ class UltimateSDUpscale:
                                seams_fix_type=SEAM_FIX_MODES[seam_fix_mode], target_size_type=2,
                                custom_width=None, custom_height=None, custom_scale=upscale_by)
 
-        # Return the resulting image
-        upscaled_image = pil_to_tensor(processed.images[0])
-        return (upscaled_image,)
+        # Return the resulting images
+        images = [pil_to_tensor(img) for img in shared.batch]
+        tensor = torch.cat(images, dim=0)
+        return (tensor,)
 
 
 class UltimateSDUpscaleNoUpscale:
@@ -152,6 +157,7 @@ class UltimateSDUpscaleNoUpscale:
 
         shared.sd_upscalers[0] = UpscalerData()
         shared.actual_upscaler = None
+        shared.batch = [tensor_to_pil(upscaled_image, i) for i in range(len(upscaled_image))]
         sdprocessing = StableDiffusionProcessing(
             tensor_to_pil(upscaled_image), model, positive, negative, vae,
             seed, steps, cfg, sampler_name, scheduler, denoise
@@ -166,8 +172,9 @@ class UltimateSDUpscaleNoUpscale:
                                seams_fix_type=SEAM_FIX_MODES[seam_fix_mode], target_size_type=2,
                                custom_width=None, custom_height=None, custom_scale=1)
 
-        upscaled_image = pil_to_tensor(processed.images[0])
-        return (upscaled_image,)
+        images = [pil_to_tensor(img) for img in shared.batch]
+        tensor = torch.cat(images, dim=0)
+        return (tensor,)
 
 
 # A dictionary that contains all nodes you want to export with their names
