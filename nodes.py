@@ -1,10 +1,7 @@
 # ComfyUI Node for Ultimate SD Upscale by Coyote-A: https://github.com/Coyote-A/ultimate-upscale-for-automatic1111
 
-import os
-import sys
 import torch
 import comfy
-sys.path.append(os.path.dirname(__file__))
 from usdu_patch import usdu
 from utils import tensor_to_pil, pil_to_tensor
 from modules.processing import StableDiffusionProcessing
