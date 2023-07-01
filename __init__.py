@@ -1,15 +1,17 @@
 import sys
 import os
-from itertools import dropwhile
 repo_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, repo_dir)
+modules = sys.modules.copy()
 from .nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
 
 # Clean up imports
 sys.path.remove(repo_dir)
-repo_name = os.path.basename(repo_dir)
-imported_modules = [k for k, v in dropwhile(lambda item: item[0] != repo_name, sys.modules.items())]
-for m in imported_modules[1:]:
-    del sys.modules[m]
+modules_to_remove = []
+for module in sys.modules:
+    if module not in modules:
+        modules_to_remove.append(module)
+for module in modules_to_remove:
+    del sys.modules[module]
