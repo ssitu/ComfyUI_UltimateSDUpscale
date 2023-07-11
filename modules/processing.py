@@ -61,13 +61,13 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     image_mask = p.image_mask.convert('L')
     init_image = p.init_images[0]
 
-    # Blur the mask
-    if p.mask_blur > 0:
-        image_mask = image_mask.filter(ImageFilter.GaussianBlur(p.mask_blur))
-
     # Locate the white region of the mask outlining the tile and add padding
     crop_region = get_crop_region(image_mask, p.inpaint_full_res_padding)
     crop_region, (p.width, p.height) = expand_crop(crop_region, image_mask.width, image_mask.height)
+
+    # Blur the mask
+    if p.mask_blur > 0:
+        image_mask = image_mask.filter(ImageFilter.GaussianBlur(p.mask_blur))
 
     # Crop the images to get the tiles that will be used for generation
     tiles = [img.crop(crop_region) for img in shared.batch]
