@@ -194,7 +194,7 @@ def crop_controlnet(cond_dict, region, init_size, canvas_size, tile_size, w_pad,
         resized_crop = resize_region(region, canvas_size, hint.shape[:-3:-1])
         hint = crop_tensor(hint.movedim(1, -1), resized_crop).movedim(-1, 1)
         hint = resize_tensor(hint, tile_size[::-1])
-        hint = pad_tensor(hint.movedim(1, -1), w_pad, w_pad, h_pad, h_pad, blur=True).movedim(-1, 1)
+        hint = pad_tensor(hint.movedim(1, -1), w_pad, w_pad, h_pad, h_pad, fill=True, blur=True).movedim(-1, 1)
         controlnet.cond_hint_original = hint
 
         c = c.previous_controlnet
