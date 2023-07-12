@@ -1,7 +1,7 @@
 from PIL import Image, ImageFilter
 import torch
 from nodes import common_ksampler, VAEEncode, VAEDecode
-from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond
+from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond, pad_image
 from modules import shared
 
 if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
@@ -10,7 +10,7 @@ if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
 
 class StableDiffusionProcessing:
 
-    def __init__(self, init_img, model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by=1):
+    def __init__(self, init_img, model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, force_uniform_tile_size):
         # Variables used by the USDU script
         self.init_images = [init_img]
         self.image_mask = None
@@ -34,6 +34,7 @@ class StableDiffusionProcessing:
         # Variables used only by this script
         self.init_size = init_img.width, init_img.height
         self.upscale_by = upscale_by
+        self.force_uniform_tile_size = force_uniform_tile_size == "enable"
 
         # Other required A1111 variables for the USDU script that is currently unused in this script
         self.extra_generation_params = {}
@@ -63,7 +64,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 
     # Locate the white region of the mask outlining the tile and add padding
     crop_region = get_crop_region(image_mask, p.inpaint_full_res_padding)
-    crop_region, (p.width, p.height) = expand_crop(crop_region, image_mask.width, image_mask.height)
+    crop_region, tile_size = expand_crop(crop_region, image_mask.width, image_mask.height)
 
     # Blur the mask
     if p.mask_blur > 0:
@@ -72,13 +73,22 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     # Crop the images to get the tiles that will be used for generation
     tiles = [img.crop(crop_region) for img in shared.batch]
     initial_tile_size = tiles[0].size
+    w_pad = 0
+    h_pad = 0
     for i in range(len(tiles)):
-        if tiles[i].size != (p.width, p.height):
-            tiles[i] = tiles[i].resize((p.width, p.height), Image.Resampling.LANCZOS)
+        if tiles[i].size != tile_size:
+            tiles[i] = tiles[i].resize(tile_size, Image.Resampling.LANCZOS)
+
+        if p.force_uniform_tile_size:
+            # Pad the tile to center it in an image of size (p.width, p.height)
+            w_pad = (p.width - tile_size[0]) // 2
+            h_pad = (p.height - tile_size[1]) // 2
+            tiles[i] = pad_image(tiles[i], left_pad=w_pad, right_pad=w_pad,
+                                 top_pad=h_pad, bottom_pad=h_pad, fill=True, blur=True)
 
     # Crop conditioning
-    positive_cropped = crop_cond(p.positive, crop_region, p.init_size, init_image.size, (p.width, p.height))
-    negative_cropped = crop_cond(p.negative, crop_region, p.init_size, init_image.size, (p.width, p.height))
+    positive_cropped = crop_cond(p.positive, crop_region, p.init_size, init_image.size, tile_size, w_pad, h_pad)
+    negative_cropped = crop_cond(p.negative, crop_region, p.init_size, init_image.size, tile_size, w_pad, h_pad)
 
     # Encode the image
     vae_encoder = VAEEncode()
@@ -98,6 +108,10 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 
     for i, tile_sampled in enumerate(tiles_sampled):
         init_image = shared.batch[i]
+
+        if p.force_uniform_tile_size:
+            # Crop out the padding from the samples
+            tile_sampled = tile_sampled.crop((w_pad, h_pad, tile_sampled.width - w_pad, tile_sampled.height - h_pad))
 
         # Resize back to the original size
         if tile_sampled.size != initial_tile_size:
