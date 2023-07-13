@@ -95,7 +95,7 @@ def pad_image(image, left_pad, right_pad, top_pad, bottom_pad, fill=False, blur=
     bottom_edge = image.crop((1, image.height - 1, image.width - 1, image.height))
     new_width = image.width + left_pad + right_pad
     new_height = image.height + top_pad + bottom_pad
-    padded_image = Image.new('RGB', (new_width, new_height), 0)
+    padded_image = Image.new(image.mode, (new_width, new_height))
     padded_image.paste(image, (left_pad, top_pad))
     if fill:
         for i in range(left_pad):
@@ -318,20 +318,11 @@ def crop_mask(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad
         mask = mask.crop(region)
 
         # Add padding
-        mask = pad_image(mask, w_pad, w_pad, h_pad, h_pad, fill=False)
+        mask = pad_image(mask, w_pad, w_pad, h_pad, h_pad, fill=True)
 
         # Resize the mask to the tile size
         if tile_size != mask.size:
             mask = mask.resize(tile_size, Image.Resampling.BICUBIC)
-
-        # # Remove mask if it is all white
-        # mask_bbox = mask.getbbox()
-        # if mask_bbox is not None:
-        #     # Check if mask is completely contains the tile
-        #     if region_intersection(region, mask_bbox) == region:
-        #         del cond_dict["mask"]
-        #         del cond_dict["mask_strength"]
-        #         return
 
         # Convert back to tensor
         mask = pil_to_tensor(mask)  # (1, H, W, 1)
