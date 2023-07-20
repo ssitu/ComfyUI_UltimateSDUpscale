@@ -120,6 +120,43 @@ def pad_image(image, left_pad, right_pad, top_pad, bottom_pad, fill=False, blur=
     return padded_image
 
 
+def pad_image2(image, left_pad, right_pad, top_pad, bottom_pad, fill=False, blur=False):
+    '''
+    Pads an image with the given number of pixels on each side and fills the padding with data from the edges. 
+    Faster than pad_image, but only pads with edge data in straight lines.
+    :param image: A PIL image
+    :param left_pad: The number of pixels to pad on the left side
+    :param right_pad: The number of pixels to pad on the right side
+    :param top_pad: The number of pixels to pad on the top side
+    :param bottom_pad: The number of pixels to pad on the bottom side
+    :param blur: Whether to blur the padded edges
+    :return: A PIL image with size (image.width + left_pad + right_pad, image.height + top_pad + bottom_pad)
+    '''
+    left_edge = image.crop((0, 1, 1, image.height - 1))
+    right_edge = image.crop((image.width - 1, 1, image.width, image.height - 1))
+    top_edge = image.crop((1, 0, image.width - 1, 1))
+    bottom_edge = image.crop((1, image.height - 1, image.width - 1, image.height))
+    new_width = image.width + left_pad + right_pad
+    new_height = image.height + top_pad + bottom_pad
+    padded_image = Image.new(image.mode, (new_width, new_height))
+    padded_image.paste(image, (left_pad, top_pad))
+    if fill:
+        if left_pad > 0:
+            padded_image.paste(left_edge.resize((left_pad, new_height), resample=Image.Resampling.NEAREST), (0, 0))
+        if right_pad > 0:
+            padded_image.paste(right_edge.resize((right_pad, new_height),
+                               resample=Image.Resampling.NEAREST), (new_width - right_pad, 0))
+        if top_pad > 0:
+            padded_image.paste(top_edge.resize((new_width, top_pad), resample=Image.Resampling.NEAREST), (0, 0))
+        if bottom_pad > 0:
+            padded_image.paste(bottom_edge.resize((new_width, bottom_pad),
+                               resample=Image.Resampling.NEAREST), (0, new_height - bottom_pad))
+        if blur and not (left_pad == right_pad == top_pad == bottom_pad == 0):
+            padded_image = padded_image.filter(ImageFilter.GaussianBlur(BLUR_KERNEL_SIZE))
+            padded_image.paste(image, (left_pad, top_pad))
+    return padded_image
+
+
 def pad_tensor(tensor, left_pad, right_pad, top_pad, bottom_pad, fill=False, blur=False):
     '''
     Pads an image tensor with the given number of pixels on each side and fills the padding with data from the edges.
@@ -131,12 +168,84 @@ def pad_tensor(tensor, left_pad, right_pad, top_pad, bottom_pad, fill=False, blu
     :param blur: Whether to blur the padded edges
     :return: A tensor of shape [B, H + top_pad + bottom_pad, W + left_pad + right_pad, C]
     '''
-    tensors = []
-    for i in range(tensor.shape[0]):
-        image = tensor_to_pil(tensor, i)
-        image = pad_image(image, left_pad, right_pad, top_pad, bottom_pad, fill, blur)
-        tensors.append(pil_to_tensor(image))
-    return torch.cat(tensors, dim=0)
+    batch_size, channels, height, width = tensor.shape
+    h_pad = left_pad + right_pad
+    v_pad = top_pad + bottom_pad
+    new_width = width + h_pad
+    new_height = height + v_pad
+
+    # Create empty image
+    padded = torch.zeros((batch_size, channels, new_height, new_width), dtype=tensor.dtype)
+
+    # Copy the original image into the centor of the padded tensor
+    padded[:, :, top_pad:top_pad + height, left_pad:left_pad + width] = tensor
+
+    # Duplicate the edges of the original image into the padding
+    if top_pad > 0:
+        padded[:, :, :top_pad, :] = padded[:, :, top_pad:top_pad + 1, :]  # Top edge
+    if bottom_pad > 0:
+        padded[:, :, -bottom_pad:, :] = padded[:, :, -bottom_pad - 1:-bottom_pad, :]  # Bottom edge
+    if left_pad > 0:
+        padded[:, :, :, :left_pad] = padded[:, :, :, left_pad:left_pad + 1]  # Left edge
+    if right_pad > 0:
+        padded[:, :, :, -right_pad:] = padded[:, :, :, -right_pad - 1:-right_pad]  # Right edge
+
+    return padded
+
+
+def resize_and_pad_image(image, width, height, fill=False, blur=False):
+    '''
+    Resizes an image to the given width and height and pads it to the given width and height.
+    :param image: A PIL image
+    :param width: The width of the resized image
+    :param height: The height of the resized image
+    :param fill: Whether to fill the padding with data from the edges
+    :param blur: Whether to blur the padded edges
+    :return: A PIL image of size (width, height)
+    '''
+    width_ratio = width / image.width
+    height_ratio = height / image.height
+    if height_ratio > width_ratio:
+        resize_ratio = width_ratio
+    else:
+        resize_ratio = height_ratio
+    resize_width = round(image.width * resize_ratio)
+    resize_height = round(image.height * resize_ratio)
+    resized = image.resize((resize_width, resize_height), resample=Image.Resampling.LANCZOS)
+    # Pad the sides of the image to get the image to the desired size that wasn't covered by the resize
+    horizontal_pad = (width - resize_width) // 2
+    vertical_pad = (height - resize_height) // 2
+    result = pad_image2(resized, horizontal_pad, horizontal_pad, vertical_pad, vertical_pad, fill, blur)
+    result = result.resize((width, height), resample=Image.Resampling.LANCZOS)
+    return result, (horizontal_pad, vertical_pad)
+
+
+def resize_and_pad_tensor(tensor, width, height, fill=False, blur=False):
+    '''
+    Resizes an image tensor to the given width and height and pads it to the given width and height.
+    :param tensor: A tensor of shape [B, H, W, C]
+    :param width: The width of the resized image
+    :param height: The height of the resized image
+    :param fill: Whether to fill the padding with data from the edges
+    :param blur: Whether to blur the padded edges
+    :return: A tensor of shape [B, height, width, C]
+    '''
+    # Resize the image to the closest size that maintains the aspect ratio
+    width_ratio = width / tensor.shape[3]
+    height_ratio = height / tensor.shape[2]
+    if height_ratio > width_ratio:
+        resize_ratio = width_ratio
+    else:
+        resize_ratio = height_ratio
+    resize_width = round(tensor.shape[3] * resize_ratio)
+    resize_height = round(tensor.shape[2] * resize_ratio)
+    resized = F.interpolate(tensor, size=(resize_height, resize_width), mode='nearest-exact')
+    # Pad the sides of the image to get the image to the desired size that wasn't covered by the resize
+    horizontal_pad = (width - resize_width) // 2
+    vertical_pad = (height - resize_height) // 2
+    result = pad_tensor(resized, horizontal_pad, horizontal_pad, vertical_pad, vertical_pad, fill, blur)
+    result = F.interpolate(result, size=(height, width), mode='nearest-exact')
+    return result
 
 
 def expand_crop(region, width, height):
@@ -194,7 +303,7 @@ def crop_controlnet(cond_dict, region, init_size, canvas_size, tile_size, w_pad,
         resized_crop = resize_region(region, canvas_size, hint.shape[:-3:-1])
         hint = crop_tensor(hint.movedim(1, -1), resized_crop).movedim(-1, 1)
         hint = resize_tensor(hint, tile_size[::-1])
-        hint = pad_tensor(hint.movedim(1, -1), w_pad, w_pad, h_pad, h_pad, fill=True, blur=True).movedim(-1, 1)
+        hint = pad_tensor(hint, w_pad, w_pad, h_pad, h_pad, fill=True, blur=True)
         controlnet.cond_hint_original = hint
 
         c = c.previous_controlnet
@@ -318,7 +427,8 @@ def crop_mask(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad
         mask = mask.crop(region)
 
         # Add padding
-        mask = pad_image(mask, w_pad, w_pad, h_pad, h_pad, fill=True)
+        # mask = pad_image(mask, w_pad, w_pad, h_pad, h_pad, fill=True)
+        mask, _ = resize_and_pad_image(mask, tile_size[0], tile_size[1], fill=True)
 
         # Resize the mask to the tile size
         if tile_size != mask.size:

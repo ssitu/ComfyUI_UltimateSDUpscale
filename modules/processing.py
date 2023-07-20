@@ -1,7 +1,7 @@
 from PIL import Image, ImageFilter
 import torch
 from nodes import common_ksampler, VAEEncode, VAEDecode
-from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond, pad_image
+from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond, resize_and_pad_image
 from modules import shared
 
 if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
@@ -80,11 +80,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
             tiles[i] = tiles[i].resize(tile_size, Image.Resampling.LANCZOS)
 
         if p.force_uniform_tile_size:
-            # Pad the tile to center it in an image of size (p.width, p.height)
-            w_pad = (p.width - tile_size[0]) // 2
-            h_pad = (p.height - tile_size[1]) // 2
-            tiles[i] = pad_image(tiles[i], left_pad=w_pad, right_pad=w_pad,
-                                 top_pad=h_pad, bottom_pad=h_pad, fill=True, blur=True)
+            tiles[i], (w_pad, h_pad) = resize_and_pad_image(tiles[i], p.width, p.height, fill=True, blur=True)
 
     # Crop conditioning
     positive_cropped = crop_cond(p.positive, crop_region, p.init_size, init_image.size, tile_size, w_pad, h_pad)
@@ -112,6 +108,8 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
         if p.force_uniform_tile_size:
             # Crop out the padding from the samples
             tile_sampled = tile_sampled.crop((w_pad, h_pad, tile_sampled.width - w_pad, tile_sampled.height - h_pad))
+            # Resize the tile to the original size
+            tile_sampled = tile_sampled.resize(initial_tile_size, Image.Resampling.LANCZOS)
 
         # Resize back to the original size
         if tile_sampled.size != initial_tile_size:
