@@ -10,7 +10,7 @@ if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
 
 class StableDiffusionProcessing:
 
-    def __init__(self, init_img, model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, force_uniform_tile_size):
+    def __init__(self, init_img, model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, uniform_tile_mode):
         # Variables used by the USDU script
         self.init_images = [init_img]
         self.image_mask = None
@@ -34,7 +34,7 @@ class StableDiffusionProcessing:
         # Variables used only by this script
         self.init_size = init_img.width, init_img.height
         self.upscale_by = upscale_by
-        self.force_uniform_tile_size = force_uniform_tile_size == "enable"
+        self.uniform_tile_mode = uniform_tile_mode
 
         # Other required A1111 variables for the USDU script that is currently unused in this script
         self.extra_generation_params = {}
@@ -79,8 +79,11 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
         if tiles[i].size != tile_size:
             tiles[i] = tiles[i].resize(tile_size, Image.Resampling.LANCZOS)
 
-        if p.force_uniform_tile_size:
-            tiles[i], (w_pad, h_pad) = resize_and_pad_image(tiles[i], p.width, p.height, fill=True, blur=True)
+        match p.uniform_tile_mode:
+            case "A1111":
+                tiles[i], (w_pad, h_pad) = resize_and_pad_image(tiles[i], p.width, p.height, fill=True, blur=False)
+            case _:
+                pass
 
     # Crop conditioning
     positive_cropped = crop_cond(p.positive, crop_region, p.init_size, init_image.size, tile_size, w_pad, h_pad)
@@ -105,11 +108,14 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     for i, tile_sampled in enumerate(tiles_sampled):
         init_image = shared.batch[i]
 
-        if p.force_uniform_tile_size:
-            # Crop out the padding from the samples
-            tile_sampled = tile_sampled.crop((w_pad, h_pad, tile_sampled.width - w_pad, tile_sampled.height - h_pad))
-            # Resize the tile to the original size
-            tile_sampled = tile_sampled.resize(initial_tile_size, Image.Resampling.LANCZOS)
+        match p.uniform_tile_mode:
+            case "A1111":
+                # Crop out the padding from the samples
+                tile_sampled = tile_sampled.crop((w_pad, h_pad, tile_sampled.width - w_pad, tile_sampled.height - h_pad))
+                # Resize the tile to the original size
+                tile_sampled = tile_sampled.resize(initial_tile_size, Image.Resampling.LANCZOS)
+            case _:
+                pass    
 
         # Resize back to the original size
         if tile_sampled.size != initial_tile_size:
