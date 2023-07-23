@@ -1,5 +1,6 @@
 from PIL import Image, ImageFilter
 import torch
+import math
 from nodes import common_ksampler, VAEEncode, VAEDecode
 from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond, resize_and_pad_image
 from modules import shared
@@ -64,7 +65,32 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 
     # Locate the white region of the mask outlining the tile and add padding
     crop_region = get_crop_region(image_mask, p.inpaint_full_res_padding)
-    crop_region, tile_size = expand_crop(crop_region, image_mask.width, image_mask.height)
+
+    match p.uniform_tile_mode:
+        case "A1111":
+            # Expand the crop region to match the processing size ratio and then resize it to the processing size
+            x1, y1, x2, y2 = crop_region
+            crop_width = x2 - x1
+            crop_height = y2 - y1
+            crop_ratio = crop_width / crop_height
+            p_ratio = p.width / p.height
+            if crop_ratio > p_ratio:
+                target_width = crop_width
+                target_height = round(crop_width / p_ratio)
+            else:
+                target_width = round(crop_height * p_ratio)
+                target_height = crop_height
+            crop_region, _ = expand_crop(crop_region, image_mask.width, image_mask.height, target_width, target_height)
+            tile_size = p.width, p.height
+        case _:
+            # Uses the minimal size that can fit the mask, minimizes tile size but may lead to image sizes that the model is not trained on
+            x1, y1, x2, y2 = crop_region
+            crop_width = x2 - x1
+            crop_height = y2 - y1
+            target_width = math.ceil(crop_width / 8) * 8
+            target_height = math.ceil(crop_height / 8) * 8
+            crop_region, tile_size = expand_crop(crop_region, image_mask.width, image_mask.height, target_width, target_height)
+            
 
     # Blur the mask
     if p.mask_blur > 0:
@@ -72,22 +98,18 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 
     # Crop the images to get the tiles that will be used for generation
     tiles = [img.crop(crop_region) for img in shared.batch]
-    initial_tile_size = tiles[0].size
-    w_pad = 0
-    h_pad = 0
-    for i in range(len(tiles)):
-        if tiles[i].size != tile_size:
-            tiles[i] = tiles[i].resize(tile_size, Image.Resampling.LANCZOS)
 
-        match p.uniform_tile_mode:
-            case "A1111":
-                tiles[i], (w_pad, h_pad) = resize_and_pad_image(tiles[i], p.width, p.height, fill=True, blur=False)
-            case _:
-                pass
+    # Assume the same size for all images in the batch
+    initial_tile_size = tiles[0].size
+
+    # Resize if necessary
+    for i, tile in enumerate(shared.batch):
+        if tile.size != tile_size:
+            tiles[i] = tile.resize(tile_size, Image.Resampling.LANCZOS)
 
     # Crop conditioning
-    positive_cropped = crop_cond(p.positive, crop_region, p.init_size, init_image.size, tile_size, w_pad, h_pad)
-    negative_cropped = crop_cond(p.negative, crop_region, p.init_size, init_image.size, tile_size, w_pad, h_pad)
+    positive_cropped = crop_cond(p.positive, crop_region, p.init_size, init_image.size, tile_size)
+    negative_cropped = crop_cond(p.negative, crop_region, p.init_size, init_image.size, tile_size)
 
     # Encode the image
     vae_encoder = VAEEncode()
@@ -107,15 +129,6 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 
     for i, tile_sampled in enumerate(tiles_sampled):
         init_image = shared.batch[i]
-
-        match p.uniform_tile_mode:
-            case "A1111":
-                # Crop out the padding from the samples
-                tile_sampled = tile_sampled.crop((w_pad, h_pad, tile_sampled.width - w_pad, tile_sampled.height - h_pad))
-                # Resize the tile to the original size
-                tile_sampled = tile_sampled.resize(initial_tile_size, Image.Resampling.LANCZOS)
-            case _:
-                pass    
 
         # Resize back to the original size
         if tile_sampled.size != initial_tile_size:

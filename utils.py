@@ -78,6 +78,57 @@ def fix_crop_region(region, image_size):
     return x1, y1, x2, y2
 
 
+def expand_crop(region, width, height, target_width, target_height):
+    '''
+    Expands a crop region to a specified target size.
+    :param region: A tuple of the form (x1, y1, x2, y2) denoting the upper left and the lower right points
+        of the rectangular region. Expected to have x2 > x1 and y2 > y1.
+    :param width: The width of the image the crop region is from.
+    :param height: The height of the image the crop region is from.
+    :param target_width: The desired width of the crop region.
+    :param target_height: The desired height of the crop region.
+    '''
+    x1, y1, x2, y2 = region
+    actual_width = x2 - x1
+    actual_height = y2 - y1
+    # target_width = math.ceil(actual_width / 8) * 8
+    # target_height = math.ceil(actual_height / 8) * 8
+
+    # Try to expand region to the right of half the difference
+    width_diff = target_width - actual_width
+    x2 = min(x2 + width_diff // 2, width)
+    # Expand region to the left of the difference including the pixels that could not be expanded to the right
+    width_diff = target_width - (x2 - x1)
+    x1 = max(x1 - width_diff, 0)
+    # Try the right again
+    width_diff = target_width - (x2 - x1)
+    x2 = min(x2 + width_diff, width)
+
+    # Try to expand region to the bottom of half the difference
+    height_diff = target_height - actual_height
+    y2 = min(y2 + height_diff // 2, height)
+    # Expand region to the top of the difference including the pixels that could not be expanded to the bottom
+    height_diff = target_height - (y2 - y1)
+    y1 = max(y1 - height_diff, 0)
+    # Try the bottom again
+    height_diff = target_height - (y2 - y1)
+    y2 = min(y2 + height_diff, height)
+
+    return (x1, y1, x2, y2), (target_width, target_height)
+
+
+def resize_region(region, init_size, resize_size):
+    # Resize a crop so that it fits an image that was resized to the given width and height
+    x1, y1, x2, y2 = region
+    init_width, init_height = init_size
+    resize_width, resize_height = resize_size
+    x1 = math.floor(x1 * resize_width / init_width)
+    x2 = math.ceil(x2 * resize_width / init_width)
+    y1 = math.floor(y1 * resize_height / init_height)
+    y2 = math.ceil(y2 * resize_height / init_height)
+    return (x1, y1, x2, y2)
+
+
 def pad_image(image, left_pad, right_pad, top_pad, bottom_pad, fill=False, blur=False):
     '''
     Pads an image with the given number of pixels on each side and fills the padding with data from the edges.
@@ -248,49 +299,6 @@ def resize_and_pad_tensor(tensor, width, height, fill=False, blur=False):
     return result
 
 
-def expand_crop(region, width, height):
-    # Expand the crop region to a multiple of 8 for encoding
-    x1, y1, x2, y2 = region
-    actual_width = x2 - x1
-    actual_height = y2 - y1
-    p_width = math.ceil(actual_width / 8) * 8
-    p_height = math.ceil(actual_height / 8) * 8
-
-    # Try to expand region to the right of half the difference
-    width_diff = p_width - actual_width
-    x2 = min(x2 + width_diff // 2, width)
-    # Expand region to the left of the difference including the pixels that could not be expanded to the right
-    width_diff = p_width - (x2 - x1)
-    x1 = max(x1 - width_diff, 0)
-    # Try the right again
-    width_diff = p_width - (x2 - x1)
-    x2 = min(x2 + width_diff, width)
-
-    # Try to expand region to the bottom of half the difference
-    height_diff = p_height - actual_height
-    y2 = min(y2 + height_diff // 2, height)
-    # Expand region to the top of the difference including the pixels that could not be expanded to the bottom
-    height_diff = p_height - (y2 - y1)
-    y1 = max(y1 - height_diff, 0)
-    # Try the bottom again
-    height_diff = p_height - (y2 - y1)
-    y2 = min(y2 + height_diff, height)
-
-    return (x1, y1, x2, y2), (p_width, p_height)
-
-
-def resize_region(region, init_size, resize_size):
-    # Resize a crop so that it fits an image that was resized to the given width and height
-    x1, y1, x2, y2 = region
-    init_width, init_height = init_size
-    resize_width, resize_height = resize_size
-    x1 = math.floor(x1 * resize_width / init_width)
-    x2 = math.ceil(x2 * resize_width / init_width)
-    y1 = math.floor(y1 * resize_height / init_height)
-    y2 = math.ceil(y2 * resize_height / init_height)
-    return (x1, y1, x2, y2)
-
-
 def crop_controlnet(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad):
     if "control" not in cond_dict:
         return
@@ -303,9 +311,7 @@ def crop_controlnet(cond_dict, region, init_size, canvas_size, tile_size, w_pad,
         resized_crop = resize_region(region, canvas_size, hint.shape[:-3:-1])
         hint = crop_tensor(hint.movedim(1, -1), resized_crop).movedim(-1, 1)
         hint = resize_tensor(hint, tile_size[::-1])
-        hint = pad_tensor(hint, w_pad, w_pad, h_pad, h_pad, fill=True, blur=True)
         controlnet.cond_hint_original = hint
-
         c = c.previous_controlnet
         controlnet.set_previous_controlnet(c.copy() if c is not None else None)
         controlnet = controlnet.previous_controlnet
@@ -427,7 +433,6 @@ def crop_mask(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad
         mask = mask.crop(region)
 
         # Add padding
-        # mask = pad_image(mask, w_pad, w_pad, h_pad, h_pad, fill=True)
         mask, _ = resize_and_pad_image(mask, tile_size[0], tile_size[1], fill=True)
 
         # Resize the mask to the tile size
@@ -442,7 +447,7 @@ def crop_mask(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad
     cond_dict["mask"] = torch.cat(masks, dim=0)  # (B, H, W)
 
 
-def crop_cond(cond, region, init_size, canvas_size, tile_size, w_pad, h_pad):
+def crop_cond(cond, region, init_size, canvas_size, tile_size, w_pad=0, h_pad=0):
     cropped = []
     for emb, x in cond:
         cond_dict = x.copy()
