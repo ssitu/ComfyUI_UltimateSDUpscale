@@ -2,7 +2,7 @@ from PIL import Image, ImageFilter
 import torch
 import math
 from nodes import common_ksampler, VAEEncode, VAEDecode
-from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond, resize_and_pad_image
+from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond
 from modules import shared
 
 if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
@@ -89,8 +89,8 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
             crop_height = y2 - y1
             target_width = math.ceil(crop_width / 8) * 8
             target_height = math.ceil(crop_height / 8) * 8
-            crop_region, tile_size = expand_crop(crop_region, image_mask.width, image_mask.height, target_width, target_height)
-            
+            crop_region, tile_size = expand_crop(crop_region, image_mask.width,
+                                                 image_mask.height, target_width, target_height)
 
     # Blur the mask
     if p.mask_blur > 0:
@@ -103,7 +103,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     initial_tile_size = tiles[0].size
 
     # Resize if necessary
-    for i, tile in enumerate(shared.batch):
+    for i, tile in enumerate(tiles):
         if tile.size != tile_size:
             tiles[i] = tile.resize(tile_size, Image.Resampling.LANCZOS)
 
