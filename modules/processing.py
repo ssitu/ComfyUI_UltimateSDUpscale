@@ -1,5 +1,6 @@
 from PIL import Image, ImageFilter
 import torch
+import math
 from nodes import common_ksampler, VAEEncode, VAEDecode
 from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond
 from modules import shared
@@ -10,7 +11,7 @@ if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
 
 class StableDiffusionProcessing:
 
-    def __init__(self, init_img, model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by=1):
+    def __init__(self, init_img, model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, uniform_tile_mode):
         # Variables used by the USDU script
         self.init_images = [init_img]
         self.image_mask = None
@@ -34,6 +35,7 @@ class StableDiffusionProcessing:
         # Variables used only by this script
         self.init_size = init_img.width, init_img.height
         self.upscale_by = upscale_by
+        self.uniform_tile_mode = uniform_tile_mode
 
         # Other required A1111 variables for the USDU script that is currently unused in this script
         self.extra_generation_params = {}
@@ -63,7 +65,32 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 
     # Locate the white region of the mask outlining the tile and add padding
     crop_region = get_crop_region(image_mask, p.inpaint_full_res_padding)
-    crop_region, (p.width, p.height) = expand_crop(crop_region, image_mask.width, image_mask.height)
+
+    match p.uniform_tile_mode:
+        case "enable":
+            # Expand the crop region to match the processing size ratio and then resize it to the processing size
+            x1, y1, x2, y2 = crop_region
+            crop_width = x2 - x1
+            crop_height = y2 - y1
+            crop_ratio = crop_width / crop_height
+            p_ratio = p.width / p.height
+            if crop_ratio > p_ratio:
+                target_width = crop_width
+                target_height = round(crop_width / p_ratio)
+            else:
+                target_width = round(crop_height * p_ratio)
+                target_height = crop_height
+            crop_region, _ = expand_crop(crop_region, image_mask.width, image_mask.height, target_width, target_height)
+            tile_size = p.width, p.height
+        case _:
+            # Uses the minimal size that can fit the mask, minimizes tile size but may lead to image sizes that the model is not trained on
+            x1, y1, x2, y2 = crop_region
+            crop_width = x2 - x1
+            crop_height = y2 - y1
+            target_width = math.ceil(crop_width / 8) * 8
+            target_height = math.ceil(crop_height / 8) * 8
+            crop_region, tile_size = expand_crop(crop_region, image_mask.width,
+                                                 image_mask.height, target_width, target_height)
 
     # Blur the mask
     if p.mask_blur > 0:
@@ -71,14 +98,18 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 
     # Crop the images to get the tiles that will be used for generation
     tiles = [img.crop(crop_region) for img in shared.batch]
+
+    # Assume the same size for all images in the batch
     initial_tile_size = tiles[0].size
-    for i in range(len(tiles)):
-        if tiles[i].size != (p.width, p.height):
-            tiles[i] = tiles[i].resize((p.width, p.height), Image.Resampling.LANCZOS)
+
+    # Resize if necessary
+    for i, tile in enumerate(tiles):
+        if tile.size != tile_size:
+            tiles[i] = tile.resize(tile_size, Image.Resampling.LANCZOS)
 
     # Crop conditioning
-    positive_cropped = crop_cond(p.positive, crop_region, p.init_size, init_image.size, (p.width, p.height))
-    negative_cropped = crop_cond(p.negative, crop_region, p.init_size, init_image.size, (p.width, p.height))
+    positive_cropped = crop_cond(p.positive, crop_region, p.init_size, init_image.size, tile_size)
+    negative_cropped = crop_cond(p.negative, crop_region, p.init_size, init_image.size, tile_size)
 
     # Encode the image
     vae_encoder = VAEEncode()

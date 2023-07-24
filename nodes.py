@@ -52,6 +52,8 @@ def USDU_base_inputs():
         ("seam_fix_width", ("INT", {"default": 64, "min": 0, "max": MAX_RESOLUTION, "step": 8})),
         ("seam_fix_mask_blur", ("INT", {"default": 8, "min": 0, "max": 64, "step": 1})),
         ("seam_fix_padding", ("INT", {"default": 16, "min": 0, "max": MAX_RESOLUTION, "step": 8})),
+        # Misc
+        ("force_uniform_tiles", (["enable", "disable"], ))
     ]
 
 
@@ -95,7 +97,7 @@ class UltimateSDUpscale:
                 steps, cfg, sampler_name, scheduler, denoise, upscale_model,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
-                seam_fix_width, seam_fix_padding):
+                seam_fix_width, seam_fix_padding, force_uniform_tiles):
         #
         # Set up A1111 patches
         #
@@ -112,7 +114,7 @@ class UltimateSDUpscale:
         # Processing
         sdprocessing = StableDiffusionProcessing(
             tensor_to_pil(image), model, positive, negative, vae,
-            seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by
+            seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, force_uniform_tiles
         )
 
         #
@@ -150,14 +152,14 @@ class UltimateSDUpscaleNoUpscale:
                 steps, cfg, sampler_name, scheduler, denoise,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
-                seam_fix_width, seam_fix_padding):
+                seam_fix_width, seam_fix_padding, force_uniform_tiles):
 
         shared.sd_upscalers[0] = UpscalerData()
         shared.actual_upscaler = None
         shared.batch = [tensor_to_pil(upscaled_image, i) for i in range(len(upscaled_image))]
         sdprocessing = StableDiffusionProcessing(
             tensor_to_pil(upscaled_image), model, positive, negative, vae,
-            seed, steps, cfg, sampler_name, scheduler, denoise
+            seed, steps, cfg, sampler_name, scheduler, denoise, 1, force_uniform_tiles
         )
 
         script = usdu.Script()
