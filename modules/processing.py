@@ -67,7 +67,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     crop_region = get_crop_region(image_mask, p.inpaint_full_res_padding)
 
     match p.uniform_tile_mode:
-        case "A1111":
+        case "enable":
             # Expand the crop region to match the processing size ratio and then resize it to the processing size
             x1, y1, x2, y2 = crop_region
             crop_width = x2 - x1
