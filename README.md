@@ -1,7 +1,6 @@
 # ComfyUI_UltimateSDUpscale
 
- [ComfyUI](https://github.com/comfyanonymous/ComfyUI) nodes for the [Ultimate Stable Diffusion Upscale script by Coyote-A](https://github.com/Coyote-A/ultimate-upscale-for-automatic1111).
- Uses the same script used in the A1111 extension to hopefully replicate images generated using the A1111 webui.
+ [ComfyUI](https://github.com/comfyanonymous/ComfyUI) nodes for the [Ultimate Stable Diffusion Upscale script by Coyote-A](https://github.com/Coyote-A/ultimate-upscale-for-automatic1111). This is a wrapper for the script used in the A1111 extension.
 
 ## Installation
 
