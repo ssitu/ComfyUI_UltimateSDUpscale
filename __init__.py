@@ -12,7 +12,8 @@ modules_used = [
     "modules.processing",
     "modules.scripts",
     "modules.shared",
-    "modules.upscaler"
+    "modules.upscaler",
+    "utils",
 ]
 original_webui_modules = {}
 for module in modules_used:
