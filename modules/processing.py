@@ -1,7 +1,7 @@
 from PIL import Image, ImageFilter
 import torch
 import math
-from nodes import common_ksampler, VAEEncode, VAEDecode
+from nodes import common_ksampler, VAEEncode, VAEDecode, VAEDecodeTiled
 from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond
 from modules import shared
 
@@ -11,7 +11,7 @@ if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
 
 class StableDiffusionProcessing:
 
-    def __init__(self, init_img, model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, uniform_tile_mode):
+    def __init__(self, init_img, model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, uniform_tile_mode, tiled_decode):
         # Variables used by the USDU script
         self.init_images = [init_img]
         self.image_mask = None
@@ -36,6 +36,10 @@ class StableDiffusionProcessing:
         self.init_size = init_img.width, init_img.height
         self.upscale_by = upscale_by
         self.uniform_tile_mode = uniform_tile_mode
+        self.tiled_decode = tiled_decode
+        self.vae_decoder = VAEDecode()
+        self.vae_encoder = VAEEncode()
+        self.vae_decoder_tiled = VAEDecodeTiled()
 
         # Other required A1111 variables for the USDU script that is currently unused in this script
         self.extra_generation_params = {}
@@ -66,7 +70,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     # Locate the white region of the mask outlining the tile and add padding
     crop_region = get_crop_region(image_mask, p.inpaint_full_res_padding)
 
-    if p.uniform_tile_mode == "enable":
+    if p.uniform_tile_mode:
         # Expand the crop region to match the processing size ratio and then resize it to the processing size
         x1, y1, x2, y2 = crop_region
         crop_width = x2 - x1
@@ -111,17 +115,19 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     negative_cropped = crop_cond(p.negative, crop_region, p.init_size, init_image.size, tile_size)
 
     # Encode the image
-    vae_encoder = VAEEncode()
     batched_tiles = torch.cat([pil_to_tensor(tile) for tile in tiles], dim=0)
-    (latent,) = vae_encoder.encode(p.vae, batched_tiles)
+    (latent,) = p.vae_encoder.encode(p.vae, batched_tiles)
 
     # Generate samples
     (samples,) = common_ksampler(p.model, p.seed, p.steps, p.cfg, p.sampler_name,
                                  p.scheduler, positive_cropped, negative_cropped, latent, denoise=p.denoise)
 
     # Decode the sample
-    vae_decoder = VAEDecode()
-    (decoded,) = vae_decoder.decode(p.vae, samples)
+    if not p.tiled_decode:
+        (decoded,) = p.vae_decoder.decode(p.vae, samples)
+    else:
+        print("[USDU] Using tiled decode")
+        (decoded,) = p.vae_decoder_tiled.decode(p.vae, samples, 512)  # Default tile size is 512
 
     # Convert the sample to a PIL image
     tiles_sampled = [tensor_to_pil(decoded, i) for i in range(len(decoded))]
@@ -132,6 +138,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
         # Resize back to the original size
         if tile_sampled.size != initial_tile_size:
             tile_sampled = tile_sampled.resize(initial_tile_size, Image.Resampling.LANCZOS)
+            
 
         # Put the tile into position
         image_tile_only = Image.new('RGBA', init_image.size)
