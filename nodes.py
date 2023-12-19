@@ -38,7 +38,7 @@ def USDU_base_inputs():
         ("cfg", ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0})),
         ("sampler_name", (comfy.samplers.KSampler.SAMPLERS,)),
         ("scheduler", (comfy.samplers.KSampler.SCHEDULERS,)),
-        ("denoise", ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01})),
+        ("denoise", ("FLOAT", {"default": 0.2, "min": 0.0, "max": 1.0, "step": 0.01})),
         # Upscale Params
         ("upscale_model", ("UPSCALE_MODEL",)),
         ("mode_type", (list(MODES.keys()),)),
