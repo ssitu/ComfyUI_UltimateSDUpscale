@@ -1,0 +1,20 @@
+name: Update Submodules
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # 每天凌晨运行
+
+jobs:
+  update-submodules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: "recursive"
+      - name: Update submodules
+        run: |
+          git submodule update --remote --merge
+          git config --global user.email "you@example.com"
+          git config --global user.name "Your Name"
+          git commit -am "Automatically update submodules"
+          git push
