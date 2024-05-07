@@ -1,5 +1,6 @@
 # ComfyUI Node for Ultimate SD Upscale by Coyote-A: https://github.com/Coyote-A/ultimate-upscale-for-automatic1111
 
+import logging
 import torch
 import comfy
 from usdu_patch import usdu
@@ -118,22 +119,31 @@ class UltimateSDUpscale:
             seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, force_uniform_tiles, tiled_decode
         )
 
-        #
-        # Running the script
-        #
-        script = usdu.Script()
-        processed = script.run(p=sdprocessing, _=None, tile_width=tile_width, tile_height=tile_height,
-                               mask_blur=mask_blur, padding=tile_padding, seams_fix_width=seam_fix_width,
-                               seams_fix_denoise=seam_fix_denoise, seams_fix_padding=seam_fix_padding,
-                               upscaler_index=0, save_upscaled_image=False, redraw_mode=MODES[mode_type],
-                               save_seams_fix_image=False, seams_fix_mask_blur=seam_fix_mask_blur,
-                               seams_fix_type=SEAM_FIX_MODES[seam_fix_mode], target_size_type=2,
-                               custom_width=None, custom_height=None, custom_scale=upscale_by)
+        # Disable logging
+        logger = logging.getLogger()
+        old_level = logger.getEffectiveLevel()
+        logger.setLevel(logging.CRITICAL + 1)
+        try:
+            #
+            # Running the script
+            #
+            script = usdu.Script()
+            processed = script.run(p=sdprocessing, _=None, tile_width=tile_width, tile_height=tile_height,
+                                   mask_blur=mask_blur, padding=tile_padding, seams_fix_width=seam_fix_width,
+                                   seams_fix_denoise=seam_fix_denoise, seams_fix_padding=seam_fix_padding,
+                                   upscaler_index=0, save_upscaled_image=False, redraw_mode=MODES[mode_type],
+                                   save_seams_fix_image=False, seams_fix_mask_blur=seam_fix_mask_blur,
+                                   seams_fix_type=SEAM_FIX_MODES[seam_fix_mode], target_size_type=2,
+                                   custom_width=None, custom_height=None, custom_scale=upscale_by)
 
-        # Return the resulting images
-        images = [pil_to_tensor(img) for img in shared.batch]
-        tensor = torch.cat(images, dim=0)
-        return (tensor,)
+            # Return the resulting images
+            images = [pil_to_tensor(img) for img in shared.batch]
+            tensor = torch.cat(images, dim=0)
+            return (tensor,)
+        finally:
+            # Restore the original logging level
+            print("Restoring logging level to", old_level)
+            logger.setLevel(old_level)
 
 
 class UltimateSDUpscaleNoUpscale:
@@ -163,18 +173,27 @@ class UltimateSDUpscaleNoUpscale:
             seed, steps, cfg, sampler_name, scheduler, denoise, 1, force_uniform_tiles, tiled_decode
         )
 
-        script = usdu.Script()
-        processed = script.run(p=sdprocessing, _=None, tile_width=tile_width, tile_height=tile_height,
-                               mask_blur=mask_blur, padding=tile_padding, seams_fix_width=seam_fix_width,
-                               seams_fix_denoise=seam_fix_denoise, seams_fix_padding=seam_fix_padding,
-                               upscaler_index=0, save_upscaled_image=False, redraw_mode=MODES[mode_type],
-                               save_seams_fix_image=False, seams_fix_mask_blur=seam_fix_mask_blur,
-                               seams_fix_type=SEAM_FIX_MODES[seam_fix_mode], target_size_type=2,
-                               custom_width=None, custom_height=None, custom_scale=1)
+        # Disable logging
+        logger = logging.getLogger()
+        old_level = logger.getEffectiveLevel()
+        logger.setLevel(logging.CRITICAL + 1)
+        try:
+            script = usdu.Script()
+            processed = script.run(p=sdprocessing, _=None, tile_width=tile_width, tile_height=tile_height,
+                                   mask_blur=mask_blur, padding=tile_padding, seams_fix_width=seam_fix_width,
+                                   seams_fix_denoise=seam_fix_denoise, seams_fix_padding=seam_fix_padding,
+                                   upscaler_index=0, save_upscaled_image=False, redraw_mode=MODES[mode_type],
+                                   save_seams_fix_image=False, seams_fix_mask_blur=seam_fix_mask_blur,
+                                   seams_fix_type=SEAM_FIX_MODES[seam_fix_mode], target_size_type=2,
+                                   custom_width=None, custom_height=None, custom_scale=1)
 
-        images = [pil_to_tensor(img) for img in shared.batch]
-        tensor = torch.cat(images, dim=0)
-        return (tensor,)
+            images = [pil_to_tensor(img) for img in shared.batch]
+            tensor = torch.cat(images, dim=0)
+            return (tensor,)
+        finally:
+            # Restore the original logging level
+            print("Restoring logging level to", old_level)
+            logger.setLevel(old_level)
 
 
 # A dictionary that contains all nodes you want to export with their names
