@@ -17,6 +17,7 @@ Nodes can be found in the node menu under `image/upscaling`:
 | --- | --- |
 | Ultimate SD Upscale | The primary node that has the most of the inputs as the original extension script. |
 | Ultimate SD Upscale <br>(No Upscale) | Same as the primary node, but without the upscale inputs and assumes that the input image is already upscaled. Use this if you already have an upscaled image or just want to do the tiled sampling. |
+| Ultimate SD Upscale <br>(Custom Sample) | Same as the primary node, but has additional inputs for a custom sampler and custom sigmas. Both must be provided if one is used. If neither is provided, the widgets (the settings below the input slots) for the sampler and step/denoise settings will be used, like in the base USDU node. |
 
 ---
 

@@ -207,7 +207,7 @@ class UltimateSDUpscaleCustomSample(UltimateSDUpscale):
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
                 seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode,
-                custom_sampler, custom_sigmas):
+                custom_sampler=None, custom_sigmas=None):
         return super().upscale(image, model, positive, negative, vae, upscale_by, seed,
                 steps, cfg, sampler_name, scheduler, denoise, upscale_model,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
