@@ -162,7 +162,6 @@ class UltimateSDUpscale:
             return (tensor,)
         finally:
             # Restore the original logging level
-            print("Restoring logging level")
             logger.setLevel(old_level)
 
 class UltimateSDUpscaleNoUpscale(UltimateSDUpscale):
