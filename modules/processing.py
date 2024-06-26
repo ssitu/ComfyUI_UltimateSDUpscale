@@ -2,6 +2,7 @@ from PIL import Image, ImageFilter
 import torch
 import math
 from nodes import common_ksampler, VAEEncode, VAEDecode, VAEDecodeTiled
+from comfy_extras.nodes_custom_sampler import SamplerCustom
 from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond
 from modules import shared
 
@@ -11,7 +12,25 @@ if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
 
 class StableDiffusionProcessing:
 
-    def __init__(self, init_img, model, positive, negative, vae, seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, uniform_tile_mode, tiled_decode):
+    def __init__(
+        self,
+        init_img,
+        model,
+        positive,
+        negative,
+        vae,
+        seed,
+        steps,
+        cfg,
+        sampler_name,
+        scheduler,
+        denoise,
+        upscale_by,
+        uniform_tile_mode,
+        tiled_decode,
+        custom_sampler=None,
+        custom_sigmas=None
+    ):
         # Variables used by the USDU script
         self.init_images = [init_img]
         self.image_mask = None
@@ -31,6 +50,13 @@ class StableDiffusionProcessing:
         self.sampler_name = sampler_name
         self.scheduler = scheduler
         self.denoise = denoise
+
+        # Optional custom sampler and sigmas
+        self.custom_sampler = custom_sampler
+        self.custom_sigmas = custom_sigmas
+
+        if (custom_sampler is not None) ^ (custom_sigmas is not None):
+            print("[USDU] Both custom sampler and custom sigmas must be provided, defaulting to widget sampler and sigmas")
 
         # Variables used only by this script
         self.init_size = init_img.width, init_img.height
@@ -58,6 +84,31 @@ class Processed:
 
 def fix_seed(p: StableDiffusionProcessing):
     pass
+
+
+def sample(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent, denoise, custom_sampler, custom_sigmas):
+    # Choose way to sample based on given inputs
+
+    # Custom sampler and sigmas
+    if custom_sampler is not None and custom_sigmas is not None:
+        custom_sample = SamplerCustom()
+        (samples, _) = getattr(custom_sample, custom_sample.FUNCTION)(
+            model=model,
+            add_noise=True,
+            noise_seed=seed,
+            cfg=cfg,
+            positive=positive,
+            negative=negative,
+            sampler=custom_sampler,
+            sigmas=custom_sigmas,
+            latent_image=latent
+        )
+        return samples
+
+    # Default
+    (samples,) = common_ksampler(model, seed, steps, cfg, sampler_name,
+                                 scheduler, positive, negative, latent, denoise=denoise)
+    return samples
 
 
 def process_images(p: StableDiffusionProcessing) -> Processed:
@@ -119,8 +170,8 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     (latent,) = p.vae_encoder.encode(p.vae, batched_tiles)
 
     # Generate samples
-    (samples,) = common_ksampler(p.model, p.seed, p.steps, p.cfg, p.sampler_name,
-                                 p.scheduler, positive_cropped, negative_cropped, latent, denoise=p.denoise)
+    samples = sample(p.model, p.seed, p.steps, p.cfg, p.sampler_name, p.scheduler, positive_cropped,
+                     negative_cropped, latent, p.denoise, p.custom_sampler, p.custom_sigmas)
 
     # Decode the sample
     if not p.tiled_decode:
@@ -138,7 +189,6 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
         # Resize back to the original size
         if tile_sampled.size != initial_tile_size:
             tile_sampled = tile_sampled.resize(initial_tile_size, Image.Resampling.LANCZOS)
-            
 
         # Put the tile into position
         image_tile_only = Image.new('RGBA', init_image.size)
