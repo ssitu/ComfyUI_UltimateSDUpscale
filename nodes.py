@@ -193,6 +193,8 @@ class UltimateSDUpscaleCustomSample(UltimateSDUpscale):
     @classmethod
     def INPUT_TYPES(s):
         required, optional = USDU_base_inputs()
+        remove_input(required, "upscale_model")
+        optional.append(("upscale_model", ("UPSCALE_MODEL",)))
         optional.append(("custom_sampler", ("SAMPLER",)))
         optional.append(("custom_sigmas", ("SIGMAS",)))
         return prepare_inputs(required, optional)
@@ -202,10 +204,11 @@ class UltimateSDUpscaleCustomSample(UltimateSDUpscale):
     CATEGORY = "image/upscaling"
 
     def upscale(self, image, model, positive, negative, vae, upscale_by, seed,
-                steps, cfg, sampler_name, scheduler, denoise, upscale_model,
+                steps, cfg, sampler_name, scheduler, denoise,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
                 seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode,
+                upscale_model=None,
                 custom_sampler=None, custom_sigmas=None):
         return super().upscale(image, model, positive, negative, vae, upscale_by, seed,
                 steps, cfg, sampler_name, scheduler, denoise, upscale_model,
