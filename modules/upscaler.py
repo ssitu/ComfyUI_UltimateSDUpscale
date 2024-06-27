@@ -10,6 +10,8 @@ if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
 class Upscaler:
 
     def _upscale(self, img: Image, scale):
+        if scale == 1.0:
+            return img
         if (shared.actual_upscaler is None):
             return img.resize((img.width * scale, img.height * scale), Image.Resampling.NEAREST)
         tensor = pil_to_tensor(img)
