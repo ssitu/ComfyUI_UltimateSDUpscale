@@ -58,7 +58,7 @@ def USDU_base_inputs():
         ("tiled_decode", ("BOOLEAN", {"default": False})),
     ]
 
-    optional = []
+    optional = [("mask", ("MASK", {"default": None})), ]
 
     return required, optional
 
@@ -104,8 +104,8 @@ class UltimateSDUpscale:
                 steps, cfg, sampler_name, scheduler, denoise, upscale_model,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
-                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode, 
-                custom_sampler=None, custom_sigmas=None):
+                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode,
+                custom_sampler=None, custom_sigmas=None, mask=None):
         # Store params
         self.tile_width = tile_width
         self.tile_height = tile_height
@@ -136,7 +136,7 @@ class UltimateSDUpscale:
         self.sdprocessing = StableDiffusionProcessing(
             tensor_to_pil(image), model, positive, negative, vae,
             seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, force_uniform_tiles, tiled_decode,
-            custom_sampler, custom_sigmas
+            custom_sampler, custom_sigmas, mask
         )
 
         # Disable logging
@@ -148,13 +148,15 @@ class UltimateSDUpscale:
             # Running the script
             #
             script = usdu.Script()
-            processed = script.run(p=self.sdprocessing, _=None, tile_width=self.tile_width, tile_height=self.tile_height,
-                               mask_blur=self.mask_blur, padding=self.tile_padding, seams_fix_width=self.seam_fix_width,
-                               seams_fix_denoise=self.seam_fix_denoise, seams_fix_padding=self.seam_fix_padding,
-                               upscaler_index=0, save_upscaled_image=False, redraw_mode=MODES[self.mode_type],
-                               save_seams_fix_image=False, seams_fix_mask_blur=self.seam_fix_mask_blur,
-                               seams_fix_type=SEAM_FIX_MODES[self.seam_fix_mode], target_size_type=2,
-                               custom_width=None, custom_height=None, custom_scale=self.upscale_by)
+            processed = script.run(p=self.sdprocessing, _=None, tile_width=self.tile_width,
+                                   tile_height=self.tile_height,
+                                   mask_blur=self.mask_blur, padding=self.tile_padding,
+                                   seams_fix_width=self.seam_fix_width,
+                                   seams_fix_denoise=self.seam_fix_denoise, seams_fix_padding=self.seam_fix_padding,
+                                   upscaler_index=0, save_upscaled_image=False, redraw_mode=MODES[self.mode_type],
+                                   save_seams_fix_image=False, seams_fix_mask_blur=self.seam_fix_mask_blur,
+                                   seams_fix_type=SEAM_FIX_MODES[self.seam_fix_mode], target_size_type=2,
+                                   custom_width=None, custom_height=None, custom_scale=self.upscale_by)
 
             # Return the resulting images
             images = [pil_to_tensor(img) for img in shared.batch]
@@ -163,6 +165,7 @@ class UltimateSDUpscale:
         finally:
             # Restore the original logging level
             logger.setLevel(old_level)
+
 
 class UltimateSDUpscaleNoUpscale(UltimateSDUpscale):
     @classmethod
@@ -181,14 +184,15 @@ class UltimateSDUpscaleNoUpscale(UltimateSDUpscale):
                 steps, cfg, sampler_name, scheduler, denoise,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
-                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode):
+                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode, mask=None):
         upscale_by = 1.0
         return super().upscale(upscaled_image, model, positive, negative, vae, upscale_by, seed,
                                steps, cfg, sampler_name, scheduler, denoise, None,
                                mode_type, tile_width, tile_height, mask_blur, tile_padding,
                                seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
-                               seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode)
-    
+                               seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode, mask=mask)
+
+
 class UltimateSDUpscaleCustomSample(UltimateSDUpscale):
     @classmethod
     def INPUT_TYPES(s):
@@ -198,7 +202,7 @@ class UltimateSDUpscaleCustomSample(UltimateSDUpscale):
         optional.append(("custom_sampler", ("SAMPLER",)))
         optional.append(("custom_sigmas", ("SIGMAS",)))
         return prepare_inputs(required, optional)
-    
+
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "upscale"
     CATEGORY = "image/upscaling"
@@ -208,14 +212,13 @@ class UltimateSDUpscaleCustomSample(UltimateSDUpscale):
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
                 seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode,
-                upscale_model=None,
-                custom_sampler=None, custom_sigmas=None):
+                upscale_model=None, custom_sampler=None, custom_sigmas=None, mask=None):
         return super().upscale(image, model, positive, negative, vae, upscale_by, seed,
-                steps, cfg, sampler_name, scheduler, denoise, upscale_model,
-                mode_type, tile_width, tile_height, mask_blur, tile_padding,
-                seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
-                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode,
-                custom_sampler, custom_sigmas)
+                               steps, cfg, sampler_name, scheduler, denoise, upscale_model,
+                               mode_type, tile_width, tile_height, mask_blur, tile_padding,
+                               seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
+                               seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode,
+                               custom_sampler, custom_sigmas, mask)
 
 
 # A dictionary that contains all nodes you want to export with their names
