@@ -9,6 +9,6 @@ Repository = "https://github.com/ssitu/ComfyUI_UltimateSDUpscale"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "ssit"
 DisplayName = "ComfyUI_UltimateSDUpscale"
 Icon = ""
