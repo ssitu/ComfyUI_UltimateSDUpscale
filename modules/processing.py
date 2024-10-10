@@ -29,11 +29,13 @@ class StableDiffusionProcessing:
         uniform_tile_mode,
         tiled_decode,
         custom_sampler=None,
-        custom_sigmas=None
+        custom_sigmas=None,
+        mask=None,
     ):
         # Variables used by the USDU script
         self.init_images = [init_img]
         self.image_mask = None
+        self.mask = mask
         self.mask_blur = 0
         self.inpaint_full_res_padding = 0
         self.width = init_img.width
@@ -150,6 +152,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     if p.mask_blur > 0:
         image_mask = image_mask.filter(ImageFilter.GaussianBlur(p.mask_blur))
 
+
     # Crop the images to get the tiles that will be used for generation
     tiles = [img.crop(crop_region) for img in shared.batch]
 
@@ -168,7 +171,8 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     # Encode the image
     batched_tiles = torch.cat([pil_to_tensor(tile) for tile in tiles], dim=0)
     (latent,) = p.vae_encoder.encode(p.vae, batched_tiles)
-
+    if p.mask is not None:
+        latent["noise_mask"] = p.mask.reshape((-1, 1, p.mask.shape[-2], p.mask.shape[-1]))
     # Generate samples
     samples = sample(p.model, p.seed, p.steps, p.cfg, p.sampler_name, p.scheduler, positive_cropped,
                      negative_cropped, latent, p.denoise, p.custom_sampler, p.custom_sigmas)
