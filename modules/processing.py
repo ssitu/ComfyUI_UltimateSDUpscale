@@ -5,10 +5,24 @@ from nodes import common_ksampler, VAEEncode, VAEDecode, VAEDecodeTiled
 from comfy_extras.nodes_custom_sampler import SamplerCustom
 from utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond
 from modules import shared
+from tqdm import tqdm
+import comfy
+from enum import Enum
 
 if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
     Image.Resampling = Image
 
+# Taken from the USDU script
+class USDUMode(Enum):
+    LINEAR = 0
+    CHESS = 1
+    NONE = 2
+
+class USDUSFMode(Enum):
+    NONE = 0
+    BAND_PASS = 1
+    HALF_TILE = 2
+    HALF_TILE_PLUS_INTERSECTIONS = 3
 
 class StableDiffusionProcessing:
 
@@ -28,8 +42,12 @@ class StableDiffusionProcessing:
         upscale_by,
         uniform_tile_mode,
         tiled_decode,
+        tile_width,
+        tile_height,
+        redraw_mode,
+        seam_fix_mode,
         custom_sampler=None,
-        custom_sigmas=None
+        custom_sigmas=None,
     ):
         # Variables used by the USDU script
         self.init_images = [init_img]
@@ -38,6 +56,8 @@ class StableDiffusionProcessing:
         self.inpaint_full_res_padding = 0
         self.width = init_img.width
         self.height = init_img.height
+        self.rows = math.ceil(self.height / tile_height)
+        self.cols = math.ceil(self.width / tile_width)
 
         # ComfyUI Sampler inputs
         self.model = model
@@ -67,10 +87,34 @@ class StableDiffusionProcessing:
         self.vae_encoder = VAEEncode()
         self.vae_decoder_tiled = VAEDecodeTiled()
 
+        if self.tiled_decode:
+            print("[USDU] Using tiled decode")
+
         # Other required A1111 variables for the USDU script that is currently unused in this script
         self.extra_generation_params = {}
 
+        # Progress bar for the entire process instead of per tile
+        self.progress_bar_enabled = False
+        if comfy.utils.PROGRESS_BAR_ENABLED:
+            self.progress_bar_enabled = True
+            comfy.utils.PROGRESS_BAR_ENABLED = False
+            self.tiles = 0
+            if redraw_mode.value != USDUMode.NONE.value:
+                self.tiles += self.rows * self.cols
+            if seam_fix_mode.value == USDUSFMode.BAND_PASS.value:
+                self.tiles += (self.rows - 1) + (self.cols - 1)
+            elif seam_fix_mode.value == USDUSFMode.HALF_TILE.value:
+                self.tiles += (self.rows - 1) * self.cols + (self.cols - 1) * self.rows
+            elif seam_fix_mode.value == USDUSFMode.HALF_TILE_PLUS_INTERSECTIONS.value:
+                self.tiles += (self.rows - 1) * self.cols + (self.cols - 1) * self.rows + (self.rows - 1) * (self.cols - 1)
+            self.pbar = None
+            # self.pbar = tqdm(total=self.tiles, desc='USDU') # Creating the pbar here will cause an empty progress bar to be displayed
 
+    def __del__(self):
+        # Undo changes to progress bar flag when node is done or cancelled
+        if self.progress_bar_enabled:
+            comfy.utils.PROGRESS_BAR_ENABLED = True
+    
 class Processed:
 
     def __init__(self, p: StableDiffusionProcessing, images: list, seed: int, info: str):
@@ -113,6 +157,10 @@ def sample(model, seed, steps, cfg, sampler_name, scheduler, positive, negative,
 
 def process_images(p: StableDiffusionProcessing) -> Processed:
     # Where the main image generation happens in A1111
+
+    # Show the progress bar
+    if p.progress_bar_enabled and p.pbar is None:
+        p.pbar = tqdm(total=p.tiles, desc='USDU', unit='tile')
 
     # Setup
     image_mask = p.image_mask.convert('L')
@@ -173,11 +221,14 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     samples = sample(p.model, p.seed, p.steps, p.cfg, p.sampler_name, p.scheduler, positive_cropped,
                      negative_cropped, latent, p.denoise, p.custom_sampler, p.custom_sigmas)
 
+    # Update the progress bar
+    if p.progress_bar_enabled:
+        p.pbar.update(1)
+
     # Decode the sample
     if not p.tiled_decode:
         (decoded,) = p.vae_decoder.decode(p.vae, samples)
     else:
-        print("[USDU] Using tiled decode")
         (decoded,) = p.vae_decoder_tiled.decode(p.vae, samples, 512)  # Default tile size is 512
 
     # Convert the sample to a PIL image

@@ -133,10 +133,11 @@ class UltimateSDUpscale:
         shared.batch = [tensor_to_pil(image, i) for i in range(len(image))]
 
         # Processing
-        self.sdprocessing = StableDiffusionProcessing(
+        sdprocessing = StableDiffusionProcessing(
             tensor_to_pil(image), model, positive, negative, vae,
             seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, force_uniform_tiles, tiled_decode,
-            custom_sampler, custom_sigmas
+            tile_width, tile_height, MODES[self.mode_type], SEAM_FIX_MODES[self.seam_fix_mode],
+            custom_sampler, custom_sigmas,
         )
 
         # Disable logging
@@ -148,7 +149,7 @@ class UltimateSDUpscale:
             # Running the script
             #
             script = usdu.Script()
-            processed = script.run(p=self.sdprocessing, _=None, tile_width=self.tile_width, tile_height=self.tile_height,
+            processed = script.run(p=sdprocessing, _=None, tile_width=self.tile_width, tile_height=self.tile_height,
                                mask_blur=self.mask_blur, padding=self.tile_padding, seams_fix_width=self.seam_fix_width,
                                seams_fix_denoise=self.seam_fix_denoise, seams_fix_padding=self.seam_fix_padding,
                                upscaler_index=0, save_upscaled_image=False, redraw_mode=MODES[self.mode_type],
