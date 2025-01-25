@@ -2,7 +2,7 @@
 name = "comfyui_ultimatesdupscale"
 description = "ComfyUI nodes for the Ultimate Stable Diffusion Upscale script by Coyote-A."
 version = "1.0.0"
-license = "LICENSE"
+license = { file = "LICENSE" }
 
 [project.urls]
 Repository = "https://github.com/ssitu/ComfyUI_UltimateSDUpscale"
