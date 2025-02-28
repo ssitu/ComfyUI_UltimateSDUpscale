@@ -1,5 +1,32 @@
 import sys
 import os
+# Check for original USDU script
+current_dir = os.path.dirname(os.path.realpath(__file__))
+repos_dir = os.path.join(current_dir, "repositories")
+usdu_dir = os.path.join(repos_dir, "ultimate_sd_upscale")
+if not os.path.exists(usdu_dir):
+    print("[USDU] Original USDU script not found, downloading it from https://github.com/Coyote-A/ultimate-upscale-for-automatic1111")
+    import urllib.request
+    import zipfile
+    import shutil
+
+    # Download the repo
+    url = "https://github.com/Coyote-A/ultimate-upscale-for-automatic1111/archive/refs/heads/master.zip"
+    zip_path = os.path.join(repos_dir, "usdu.zip")
+    urllib.request.urlretrieve(url, zip_path)
+
+    # Extract the repo
+    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+        zip_ref.extractall(repos_dir)
+    
+    # Move the repo to the correct location
+    extracted_dir = os.path.join(repos_dir, "ultimate-upscale-for-automatic1111-master")
+    shutil.move(extracted_dir, usdu_dir)
+
+    # Clean up
+    os.remove(zip_path)
+    
+    print("[USDU] Original USDU script downloaded successfully")
 
 # Remove other custom_node paths from sys.path to avoid conflicts
 custom_node_paths = [path for path in sys.path if "custom_node" in path]
