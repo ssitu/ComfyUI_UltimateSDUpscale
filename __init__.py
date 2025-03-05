@@ -4,7 +4,7 @@ import os
 current_dir = os.path.dirname(os.path.realpath(__file__))
 repos_dir = os.path.join(current_dir, "repositories")
 usdu_dir = os.path.join(repos_dir, "ultimate_sd_upscale")
-if not os.path.exists(usdu_dir):
+if len(os.listdir(usdu_dir)) == 0:
     print("[USDU] Original USDU script not found, downloading it from https://github.com/Coyote-A/ultimate-upscale-for-automatic1111")
     import urllib.request
     import zipfile
