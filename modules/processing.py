@@ -8,6 +8,8 @@ from modules import shared
 from tqdm import tqdm
 import comfy
 from enum import Enum
+import json
+import os
 
 if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
     Image.Resampling = Image
@@ -93,11 +95,18 @@ class StableDiffusionProcessing:
         # Other required A1111 variables for the USDU script that is currently unused in this script
         self.extra_generation_params = {}
 
+        # Load config file for USDU
+        config_path = os.path.join(os.path.dirname(__file__), os.pardir, 'config.json')
+        config = {}
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+
         # Progress bar for the entire process instead of per tile
         self.progress_bar_enabled = False
         if comfy.utils.PROGRESS_BAR_ENABLED:
             self.progress_bar_enabled = True
-            comfy.utils.PROGRESS_BAR_ENABLED = False
+            comfy.utils.PROGRESS_BAR_ENABLED = config.get('per_tile_progress', True)
             self.tiles = 0
             if redraw_mode.value != USDUMode.NONE.value:
                 self.tiles += self.rows * self.cols
