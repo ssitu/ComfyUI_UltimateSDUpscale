@@ -16,6 +16,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Include submodule files
+        run: |
+          # Remove the submodule's .git folder so it becomes a normal directory
+          rm -rf repositories/ultimate_sd_upscale/.git
+          # Add the now "regular" folder to the index
+          git add repositories/ultimate_sd_upscale
+
       - name: Publish Custom Node
         uses: Comfy-Org/publish-node-action@main
         with:
