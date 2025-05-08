@@ -20,6 +20,7 @@ jobs:
       - name: Include submodule files
         run: |
           # Remove the submodule's .git folder so it becomes a normal directory
+          git rm --cached repositories/ultimate_sd_upscale
           rm -rf repositories/ultimate_sd_upscale/.git
           # Add the now "regular" folder to the index
           git add repositories/ultimate_sd_upscale
