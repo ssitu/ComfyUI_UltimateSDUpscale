@@ -16,7 +16,7 @@ class Upscaler:
             return img.resize((img.width * scale, img.height * scale), Image.Resampling.NEAREST)
         tensor = pil_to_tensor(img)
         image_upscale_node = ImageUpscaleWithModel()
-        (upscaled,) = image_upscale_node.upscale(shared.actual_upscaler, tensor)
+        (upscaled,) = image_upscale_node.upscale(shared.actual_upscaler, tensor.contiguous())  # Tensor may not be contiguous on Mac
         return tensor_to_pil(upscaled)
 
     def upscale(self, img: Image, scale, selected_model: str = None):
