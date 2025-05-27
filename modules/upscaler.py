@@ -14,7 +14,7 @@ class Upscaler:
             return img
         if (shared.actual_upscaler is None):
             return img.resize((img.width * scale, img.height * scale), Image.Resampling.LANCZOS)
-        (upscaled, ) = ImageUpscaleWithModel().upscale_model(shared.actual_upscaler, shared.batch_as_tensor)
+        (upscaled, ) = ImageUpscaleWithModel().upscale(shared.actual_upscaler, shared.batch_as_tensor)
         shared.batch = [tensor_to_pil(upscaled, i) for i in range(len(upscaled))]
         return shared.batch[0]
 
