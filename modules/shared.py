@@ -22,3 +22,4 @@ actual_upscaler = None
 
 # Batch of images to upscale
 batch = None
+batch_as_tensor = None
