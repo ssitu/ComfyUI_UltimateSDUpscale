@@ -130,11 +130,12 @@ class UltimateSDUpscale:
         shared.actual_upscaler = upscale_model
 
         # Set the batch of images
-        shared.batch = [tensor_to_pil(image, i) for i in range(len(image))]
+        shared.batch = [tensor_to_pil(image, 0)]  # Script only works with one image, we will do the batch processing ourselves
+        shared.batch_as_tensor = image
 
         # Processing
         sdprocessing = StableDiffusionProcessing(
-            tensor_to_pil(image), model, positive, negative, vae,
+            shared.batch[0], model, positive, negative, vae,
             seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, force_uniform_tiles, tiled_decode,
             tile_width, tile_height, MODES[self.mode_type], SEAM_FIX_MODES[self.seam_fix_mode],
             custom_sampler, custom_sigmas,

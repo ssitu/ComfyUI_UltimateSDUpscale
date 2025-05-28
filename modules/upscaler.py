@@ -9,18 +9,13 @@ if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
 
 class Upscaler:
 
-    def _upscale(self, img: Image, scale):
+    def upscale(self, img: Image, scale, selected_model: str = None):
         if scale == 1.0:
             return img
         if (shared.actual_upscaler is None):
-            return img.resize((img.width * scale, img.height * scale), Image.Resampling.NEAREST)
-        tensor = pil_to_tensor(img)
-        image_upscale_node = ImageUpscaleWithModel()
-        (upscaled,) = image_upscale_node.upscale(shared.actual_upscaler, tensor.contiguous())  # Tensor may not be contiguous on Mac
-        return tensor_to_pil(upscaled)
-
-    def upscale(self, img: Image, scale, selected_model: str = None):
-        shared.batch = [self._upscale(img, scale) for img in shared.batch]
+            return img.resize((img.width * scale, img.height * scale), Image.Resampling.LANCZOS)
+        (upscaled,) = ImageUpscaleWithModel().upscale(shared.actual_upscaler, shared.batch_as_tensor)
+        shared.batch = [tensor_to_pil(upscaled, i) for i in range(len(upscaled))]
         return shared.batch[0]
 
 
