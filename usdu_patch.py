@@ -14,7 +14,7 @@ if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
 
 
 def round_length(length, multiple=8):
-    return math.ceil(length / multiple) * multiple
+    return round(length / multiple) * multiple
 
 
 # Upscaler
