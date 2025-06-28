@@ -14,7 +14,7 @@ BLUR_KERNEL_SIZE = 15
 def tensor_to_pil(img_tensor, batch_index=0):
     # Takes a batch of images in the form of a tensor of shape [batch_size, height, width, channels]
     # and returns an RGB PIL Image. Assumes channels=3
-    return Image.fromarray((255 * img_tensor[batch_index].numpy()).astype(np.uint8))
+    return Image.fromarray((255 * img_tensor[batch_index].cpu().numpy()).astype(np.uint8))
 
 
 def pil_to_tensor(image):
