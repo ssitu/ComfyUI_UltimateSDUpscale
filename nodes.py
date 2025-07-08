@@ -130,7 +130,7 @@ class UltimateSDUpscale:
         shared.actual_upscaler = upscale_model
 
         # Set the batch of images
-        shared.batch = [tensor_to_pil(image, 0)]  # Script only works with one image, we will do the batch processing ourselves
+        shared.batch = [tensor_to_pil(image, i) for i in range(len(image))]
         shared.batch_as_tensor = image
 
         # Processing
