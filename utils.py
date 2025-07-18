@@ -441,6 +441,61 @@ def crop_mask(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad
 
     cond_dict["mask"] = torch.cat(masks, dim=0)  # (B, H, W)
 
+# Added Flux-Kontext Support crop_reference_latents by TBG ETUR
+def crop_reference_latents(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad):
+    """
+    1. Resize each latent to `canvas_size` in latent units.
+    2. Crop the rectangle `region` (pixel coordinates).
+    3. Down-sample the crop to latent-space `tile_size`.
+    Expects a list of BCHW tensors under "reference_latents".
+    """
+
+    latents = cond_dict.get("reference_latents")
+    if not isinstance(latents, list):
+        return  # nothing to do
+
+    k = 8  # down-sample factor from pixel space → latent space (SD-type models)
+
+    W_can_px, H_can_px = canvas_size
+    # canvas size expressed in latent units
+    W_can_lat, H_can_lat = W_can_px // k, H_can_px // k
+
+    W_tile_px, H_tile_px = tile_size
+    W_tile_lat, H_tile_lat = max(1, W_tile_px // k), max(1, H_tile_px // k)
+
+    x1_px, y1_px, x2_px, y2_px = region
+
+    new_latents = []
+    for t in latents:  # (B,C,H_lat_in,W_lat_in)
+        if t.ndim != 4:
+            raise ValueError(f"expected BCHW, got {t.shape}")
+
+        # 1. Resize to canvas resolution in latent units only if needed
+        if t.shape[-2:] != (H_can_lat, W_can_lat):
+            t = F.interpolate(t,
+                              size=(H_can_lat, W_can_lat),
+                              mode="bilinear",
+                              align_corners=False)
+
+        # 2. Convert pixel crop → latent slice
+        w0_lat = int(round(x1_px / k))
+        w1_lat = int(round(x2_px / k))
+        h0_lat = int(round(y1_px / k))
+        h1_lat = int(round(y2_px / k))
+
+        cropped = t[:, :, h0_lat:h1_lat, w0_lat:w1_lat]  # view
+
+        # 3. Down-sample to latent-tile size
+        cropped = F.interpolate(cropped,
+                                size=(H_tile_lat, W_tile_lat),
+                                mode="bilinear",
+                                align_corners=False)
+
+        new_latents.append(cropped)
+
+    cond_dict["reference_latents"] = new_latents
+
+
 
 def crop_cond(cond, region, init_size, canvas_size, tile_size, w_pad=0, h_pad=0):
     cropped = []
@@ -451,5 +506,6 @@ def crop_cond(cond, region, init_size, canvas_size, tile_size, w_pad=0, h_pad=0)
         crop_gligen(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad)
         crop_area(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad)
         crop_mask(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad)
+        crop_reference_latents(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad)
         cropped.append(n)
     return cropped
