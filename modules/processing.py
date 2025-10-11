@@ -58,8 +58,8 @@ class StableDiffusionProcessing:
         self.inpaint_full_res_padding = 0
         self.width = init_img.width * upscale_by
         self.height = init_img.height * upscale_by
-        self.rows = math.ceil(self.height / tile_height)
-        self.cols = math.ceil(self.width / tile_width)
+        self.rows = round(self.height / tile_height)
+        self.cols = round(self.width / tile_width)
 
         # ComfyUI Sampler inputs
         self.model = model
