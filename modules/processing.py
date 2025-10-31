@@ -144,8 +144,7 @@ def sample(model, seed, steps, cfg, sampler_name, scheduler, positive, negative,
 
     # Custom sampler and sigmas
     if custom_sampler is not None and custom_sigmas is not None:
-        custom_sample = SamplerCustom()
-        (samples, _) = getattr(custom_sample, custom_sample.FUNCTION)(
+        kwargs = dict(
             model=model,
             add_noise=True,
             noise_seed=seed,
@@ -156,6 +155,11 @@ def sample(model, seed, steps, cfg, sampler_name, scheduler, positive, negative,
             sigmas=custom_sigmas,
             latent_image=latent
         )
+        if "execute" in dir(SamplerCustom):
+            (samples, _) = SamplerCustom.execute(**kwargs)
+        else:
+            custom_sample = SamplerCustom()
+            (samples, _) = getattr(custom_sample, custom_sample.FUNCTION)(**kwargs)
         return samples
 
     # Default
