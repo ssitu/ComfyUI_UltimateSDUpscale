@@ -45,7 +45,6 @@ def round_length(length: int, multiple: int = 8) -> int:
     return round(length / multiple) * multiple
 
 
-# PIL <-> tensor helpers (adapted from your inline utilities)
 def _pil_to_tensor(image: Image.Image) -> torch.Tensor:
     """Convert PIL image to CHW-like float tensor in [0,1], with batch dim omitted."""
     arr = np.array(image).astype(np.float32) / 255.0

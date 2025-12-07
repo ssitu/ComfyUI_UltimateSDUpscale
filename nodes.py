@@ -94,6 +94,7 @@ class UltimateSDUpscale:
     @classmethod
     def INPUT_TYPES(s):
         required, optional = USDU_base_inputs()
+        required.append(("batch_size", ("INT", {"default": 1, "min": 1, "max": 16, "step": 1})))
         return prepare_inputs(required, optional)
 
     RETURN_TYPES = ("IMAGE",)
@@ -104,7 +105,7 @@ class UltimateSDUpscale:
                 steps, cfg, sampler_name, scheduler, denoise, upscale_model,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
-                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode, 
+                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode, batch_size,
                 custom_sampler=None, custom_sigmas=None):
         # Store params
         self.tile_width = tile_width
@@ -133,8 +134,8 @@ class UltimateSDUpscale:
         shared.batch = [tensor_to_pil(image, i) for i in range(len(image))]
         shared.batch_as_tensor = image
 
-        # Get batch_size from instance if available (for UltimateSDUpscaleNoUpscale)
-        batch_size = getattr(self, 'batch_size', 1)
+        # Store batch_size for use in processing
+        self.batch_size = batch_size
         print(f"[USDU Batch Debug] UltimateSDUpscale.upscale() using batch_size={batch_size}")
 
         # Processing
@@ -200,13 +201,14 @@ class UltimateSDUpscaleNoUpscale(UltimateSDUpscale):
                                steps, cfg, sampler_name, scheduler, denoise, None,
                                mode_type, tile_width, tile_height, mask_blur, tile_padding,
                                seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
-                               seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode)
+                               seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode, batch_size)
     
 class UltimateSDUpscaleCustomSample(UltimateSDUpscale):
     @classmethod
     def INPUT_TYPES(s):
         required, optional = USDU_base_inputs()
         remove_input(required, "upscale_model")
+        required.append(("batch_size", ("INT", {"default": 1, "min": 1, "max": 16, "step": 1})))
         optional.append(("upscale_model", ("UPSCALE_MODEL",)))
         optional.append(("custom_sampler", ("SAMPLER",)))
         optional.append(("custom_sigmas", ("SIGMAS",)))
@@ -220,14 +222,14 @@ class UltimateSDUpscaleCustomSample(UltimateSDUpscale):
                 steps, cfg, sampler_name, scheduler, denoise,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
-                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode,
+                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode, batch_size,
                 upscale_model=None,
                 custom_sampler=None, custom_sigmas=None):
         return super().upscale(image, model, positive, negative, vae, upscale_by, seed,
                 steps, cfg, sampler_name, scheduler, denoise, upscale_model,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
-                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode,
+                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode, batch_size,
                 custom_sampler, custom_sigmas)
 
 
