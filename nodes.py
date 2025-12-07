@@ -4,7 +4,7 @@ import logging
 import torch
 import comfy
 from usdu_patch import usdu
-from utils import tensor_to_pil, pil_to_tensor
+from utils import tensor_to_pil, pil_to_tensor, pad_image2
 from modules.processing import StableDiffusionProcessing
 import modules.shared as shared
 from modules.upscaler import UpscalerData
@@ -133,13 +133,18 @@ class UltimateSDUpscale:
         shared.batch = [tensor_to_pil(image, i) for i in range(len(image))]
         shared.batch_as_tensor = image
 
+        # Get batch_size from instance if available (for UltimateSDUpscaleNoUpscale)
+        batch_size = getattr(self, 'batch_size', 1)
+        print(f"[USDU Batch Debug] UltimateSDUpscale.upscale() using batch_size={batch_size}")
+
         # Processing
         sdprocessing = StableDiffusionProcessing(
             shared.batch[0], model, positive, negative, vae,
             seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, force_uniform_tiles, tiled_decode,
             tile_width, tile_height, MODES[self.mode_type], SEAM_FIX_MODES[self.seam_fix_mode],
-            custom_sampler, custom_sigmas,
+            custom_sampler, custom_sigmas, batch_size,
         )
+        print(f"[USDU Batch Debug] StableDiffusionProcessing created with batch_size={sdprocessing.batch_size}")
 
         # Disable logging
         logger = logging.getLogger()
@@ -173,6 +178,7 @@ class UltimateSDUpscaleNoUpscale(UltimateSDUpscale):
         remove_input(required, "upscale_model")
         remove_input(required, "upscale_by")
         rename_input(required, "image", "upscaled_image")
+        required.append(("batch_size", ("INT", {"default": 1, "min": 1, "max": 16, "step": 1})))
         return prepare_inputs(required, optional)
 
     RETURN_TYPES = ("IMAGE",)
@@ -183,8 +189,13 @@ class UltimateSDUpscaleNoUpscale(UltimateSDUpscale):
                 steps, cfg, sampler_name, scheduler, denoise,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
-                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode):
+                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode, batch_size):
         upscale_by = 1.0
+
+        # Store batch_size for use in processing
+        self.batch_size = batch_size
+        print(f"[USDU Batch Debug] UltimateSDUpscaleNoUpscale.upscale() received batch_size={batch_size}")
+
         return super().upscale(upscaled_image, model, positive, negative, vae, upscale_by, seed,
                                steps, cfg, sampler_name, scheduler, denoise, None,
                                mode_type, tile_width, tile_height, mask_blur, tile_padding,
@@ -200,7 +211,7 @@ class UltimateSDUpscaleCustomSample(UltimateSDUpscale):
         optional.append(("custom_sampler", ("SAMPLER",)))
         optional.append(("custom_sigmas", ("SIGMAS",)))
         return prepare_inputs(required, optional)
-    
+
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "upscale"
     CATEGORY = "image/upscaling"
@@ -220,17 +231,148 @@ class UltimateSDUpscaleCustomSample(UltimateSDUpscale):
                 custom_sampler, custom_sigmas)
 
 
+class UltimateSDUpscaleTiler:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "tile_width": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
+                "tile_height": ("INT", {"default": 512, "min": 64, "max": MAX_RESOLUTION, "step": 8}),
+                "tile_padding": ("INT", {"default": 32, "min": 0, "max": MAX_RESOLUTION, "step": 8}),
+                "mode_type": (list(MODES.keys()),),
+                "force_uniform_tiles": ("BOOLEAN", {"default": True}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "INT", "INT", "INT")
+    RETURN_NAMES = ("tiles", "rows", "cols", "tile_count")
+    FUNCTION = "tile_image"
+    CATEGORY = "image/upscaling"
+
+    def calc_rectangle(self, xi, yi, tile_width, tile_height):
+        """Calculate tile rectangle coordinates"""
+        x1 = xi * tile_width
+        y1 = yi * tile_height
+        x2 = xi * tile_width + tile_width
+        y2 = yi * tile_height + tile_height
+        return x1, y1, x2, y2
+
+    def tile_image(self, image, tile_width, tile_height, tile_padding, mode_type, force_uniform_tiles):
+        from PIL import Image
+        import math
+
+        # Get the image dimensions (batch, height, width, channels)
+        batch_size = len(image)
+        img_height = image.shape[1]
+        img_width = image.shape[2]
+
+        # Calculate grid dimensions
+        rows = math.ceil(img_height / tile_height)
+        cols = math.ceil(img_width / tile_width)
+
+        mode = MODES[mode_type]
+
+        # Process each image in the batch
+        all_tiles = []
+
+        for batch_idx in range(batch_size):
+            # Convert tensor to PIL for easier cropping
+            pil_image = tensor_to_pil(image, batch_idx)
+
+            # If force_uniform_tiles, resize the image to fit the grid exactly
+            if force_uniform_tiles:
+                target_width = cols * tile_width
+                target_height = rows * tile_height
+                if pil_image.width != target_width or pil_image.height != target_height:
+                    pil_image = pil_image.resize((target_width, target_height), Image.Resampling.LANCZOS)
+
+            batch_tiles = []
+
+            if mode == usdu.USDUMode.LINEAR:
+                # Linear mode: process tiles row by row
+                for yi in range(rows):
+                    for xi in range(cols):
+                        x1, y1, x2, y2 = self.calc_rectangle(xi, yi, tile_width, tile_height)
+                        # Crop the tile
+                        tile = pil_image.crop((x1, y1, min(x2, pil_image.width), min(y2, pil_image.height)))
+
+                        # Add padding if specified
+                        if tile_padding > 0:
+                            tile = pad_image2(tile, tile_padding, tile_padding, tile_padding, tile_padding, fill=True, blur=False)
+
+                        batch_tiles.append(pil_to_tensor(tile))
+
+            elif mode == usdu.USDUMode.CHESS:
+                # Chess mode: process tiles in checkerboard pattern
+                # First, determine tile colors
+                tiles_map = []
+                for yi in range(rows):
+                    tiles_map.append([])
+                    for xi in range(cols):
+                        color = xi % 2 == 0
+                        if yi > 0 and yi % 2 != 0:
+                            color = not color
+                        tiles_map[yi].append(color)
+
+                # Process white tiles first
+                for yi in range(rows):
+                    for xi in range(cols):
+                        if tiles_map[yi][xi]:  # White tiles
+                            x1, y1, x2, y2 = self.calc_rectangle(xi, yi, tile_width, tile_height)
+                            tile = pil_image.crop((x1, y1, min(x2, pil_image.width), min(y2, pil_image.height)))
+
+                            if tile_padding > 0:
+                                tile = pad_image2(tile, tile_padding, tile_padding, tile_padding, tile_padding, fill=True, blur=False)
+
+                            batch_tiles.append(pil_to_tensor(tile))
+
+                # Then process black tiles
+                for yi in range(rows):
+                    for xi in range(cols):
+                        if not tiles_map[yi][xi]:  # Black tiles
+                            x1, y1, x2, y2 = self.calc_rectangle(xi, yi, tile_width, tile_height)
+                            tile = pil_image.crop((x1, y1, min(x2, pil_image.width), min(y2, pil_image.height)))
+
+                            if tile_padding > 0:
+                                tile = pad_image2(tile, tile_padding, tile_padding, tile_padding, tile_padding, fill=True, blur=False)
+
+                            batch_tiles.append(pil_to_tensor(tile))
+
+            else:  # USDUMode.NONE
+                # None mode: return the entire image as a single tile
+                tile = pil_image
+                if tile_padding > 0:
+                    tile = pad_image2(tile, tile_padding, tile_padding, tile_padding, tile_padding, fill=True, blur=False)
+                batch_tiles.append(pil_to_tensor(tile))
+
+            all_tiles.extend(batch_tiles)
+
+        # Stack all tiles into a single tensor
+        tiles_tensor = torch.cat(all_tiles, dim=0)
+
+        # Calculate total tile count
+        if mode == usdu.USDUMode.NONE:
+            tile_count = batch_size
+        else:
+            tile_count = rows * cols * batch_size
+
+        return (tiles_tensor, rows, cols, tile_count)
+
+
 # A dictionary that contains all nodes you want to export with their names
 # NOTE: names should be globally unique
 NODE_CLASS_MAPPINGS = {
     "UltimateSDUpscale": UltimateSDUpscale,
     "UltimateSDUpscaleNoUpscale": UltimateSDUpscaleNoUpscale,
-    "UltimateSDUpscaleCustomSample": UltimateSDUpscaleCustomSample
+    "UltimateSDUpscaleCustomSample": UltimateSDUpscaleCustomSample,
+    "UltimateSDUpscaleTiler": UltimateSDUpscaleTiler
 }
 
 # A dictionary that contains the friendly/humanly readable titles for the nodes
 NODE_DISPLAY_NAME_MAPPINGS = {
     "UltimateSDUpscale": "Ultimate SD Upscale",
     "UltimateSDUpscaleNoUpscale": "Ultimate SD Upscale (No Upscale)",
-    "UltimateSDUpscaleCustomSample": "Ultimate SD Upscale (Custom Sample)"
+    "UltimateSDUpscaleCustomSample": "Ultimate SD Upscale (Custom Sample)",
+    "UltimateSDUpscaleTiler": "Ultimate SD Upscale Tiler"
 }
