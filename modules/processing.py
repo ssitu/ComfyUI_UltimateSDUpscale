@@ -50,6 +50,7 @@ class StableDiffusionProcessing:
         seam_fix_mode,
         custom_sampler=None,
         custom_sigmas=None,
+        batch_size=1,
     ):
         # Variables used by the USDU script
         self.init_images = [init_img]
@@ -85,6 +86,7 @@ class StableDiffusionProcessing:
         self.upscale_by = upscale_by
         self.uniform_tile_mode = uniform_tile_mode
         self.tiled_decode = tiled_decode
+        self.batch_size = batch_size
         self.vae_decoder = VAEDecode()
         self.vae_encoder = VAEEncode()
         self.vae_decoder_tiled = VAEDecodeTiled()
