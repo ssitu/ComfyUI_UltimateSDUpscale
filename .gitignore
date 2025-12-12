@@ -153,3 +153,4 @@ cython_debug/
 
 # Other
 *.ipynb
+*.code-workspace

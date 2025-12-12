@@ -4,7 +4,7 @@ import logging
 import torch
 import comfy
 from usdu_patch import usdu
-from utils import tensor_to_pil, pil_to_tensor
+from usdu_utils import tensor_to_pil, pil_to_tensor
 from modules.processing import StableDiffusionProcessing
 import modules.shared as shared
 from modules.upscaler import UpscalerData
