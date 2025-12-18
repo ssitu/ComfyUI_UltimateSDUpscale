@@ -57,7 +57,7 @@ After the redraw step, the seam fix step is applied if enabled. There are variou
     - **None**: Skips the redraw step entirely. Useful if you only want to use the seam fix step to fix visible seams without adding new details.
 
 4. **Denoise Settings**
-    - Use a lower denoise (0.05-0.3) to refine the upscaled image to be less blurry, while avoiding seams and hallucinations.
+    - Use a lower denoise (0.05-0.2) to refine the upscaled image to be less blurry, while avoiding seams and hallucinations.
     - Higher denoise values are only usable when using something like a ControlNet tile model to avoid tiles and seams.
 
 5. **Seam Fix Modes**
