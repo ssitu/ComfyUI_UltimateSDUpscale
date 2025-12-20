@@ -7,7 +7,7 @@ import torch
 from PIL import Image
 
 import usdu_utils
-from test_utils import execute
+from helpers import execute
 from configs import DirectoryConfig
 
 BASE_IMAGE_1 = "main1_sd15.jpg"
