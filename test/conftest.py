@@ -30,9 +30,13 @@ def pytest_configure(config):
     if str(COMFYUI_ROOT) not in sys.path:
         sys.path.insert(0, str(COMFYUI_ROOT))
 
-    # from comfy.cli_args import args
+    from comfy.cli_args import args
+
     # args.cpu = True  # Force CPU mode for tests
     # args.force_fp16 = True  # Force float16 mode for tests
+    args.disable_all_custom_nodes = True
+    # Assumes the name of the custom node folder is ComfyUI_UltimateSDUpscale
+    args.whitelist_custom_nodes = ["ComfyUI_UltimateSDUpscale"]
 
 
 #
@@ -68,38 +72,6 @@ def _setup_comfyui_paths():
     apply_custom_paths()
 
 
-def _disable_other_custom_nodes():
-    """Disable other custom nodes by adding .disabled to their directories. Ideally, a fresh ComfyUI install is used instead."""
-    custom_nodes_root = COMFYUI_ROOT / "custom_nodes"
-    renamed_directories = []
-    for node_dir in custom_nodes_root.iterdir():
-        # Ignore non-directories, this repository, already disabled nodes, and __pycache__
-        if (
-            node_dir.is_dir()
-            and node_dir != REPO_ROOT
-            and node_dir.suffix != ".disabled"
-            and not node_dir.name.startswith("__")
-        ):
-            try:
-                disabled_dir = node_dir.with_suffix(".disabled")
-                os.rename(node_dir, disabled_dir)
-                logging.info(f"Disabled custom node: {node_dir.name}")
-                renamed_directories.append(disabled_dir)
-            except Exception as e:
-                logging.warning(f"Failed to disable custom node {node_dir.name}: {e}")
-    return renamed_directories
-
-
-def _enable_other_custom_nodes(renamed_directories):
-    """Re-enable other custom nodes by removing .disabled from their directories"""
-    for node_dir in renamed_directories:
-        try:
-            os.rename(node_dir, node_dir.with_suffix(""))
-            logging.info(f"Re-enabled custom node: {node_dir.name}")
-        except Exception as e:
-            logging.warning(f"Failed to re-enable custom node {node_dir.name}: {e}")
-
-
 #
 # # Fixtures
 #
@@ -116,9 +88,6 @@ def comfyui_initialized():
     """Initialize ComfyUI nodes once per test session."""
     from nodes import init_extra_nodes
 
-    renamed_directories = _disable_other_custom_nodes()
-    _setup_comfyui_paths()
-
     async def _init():
         with SilenceLogs():
             await init_extra_nodes(init_api_nodes=False)
@@ -126,9 +95,6 @@ def comfyui_initialized():
     asyncio.run(_init())
 
     yield True
-
-    # Teardown: Re-enable the disabled custom nodes after all tests complete
-    _enable_other_custom_nodes(renamed_directories)
 
 
 @pytest.fixture(scope="session")
