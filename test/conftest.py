@@ -154,9 +154,12 @@ def upscale_model(comfyui_initialized, node_classes):
 def test_dirs():
     """Return paths to test and sample image directories."""
     test_dir = REPO_ROOT / "test"
+    test_image_dir = test_dir / "test_images"
+    sample_image_dir = test_dir / "sample_images"
+    sample_image_dir.mkdir(exist_ok=True)
     return DirectoryConfig(
-        test_images=test_dir / "test_images",
-        sample_images=test_dir / "sample_images",
+        test_images=test_image_dir,
+        sample_images=sample_image_dir,
     )
 
 

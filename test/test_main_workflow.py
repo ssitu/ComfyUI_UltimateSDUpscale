@@ -161,7 +161,6 @@ class TestMainWorkflow:
         """Save sample images for visual inspection (optional utility test)."""
         image, _, _ = base_image
         sample_dir = test_dirs.sample_images
-        sample_dir.mkdir(exist_ok=True)
 
         # Save base images
         usdu_utils.tensor_to_pil(image).save(sample_dir / BASE_IMAGE_1)
