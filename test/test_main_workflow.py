@@ -7,7 +7,7 @@ import torch
 from PIL import Image
 
 import usdu_utils
-from helpers import execute
+from helpers import execute, img_tensor_diff
 from configs import DirectoryConfig
 
 BASE_IMAGE_1 = "main1_sd15.jpg"
@@ -74,8 +74,8 @@ class TestMainWorkflow:
         test_im1 = usdu_utils.pil_to_tensor(Image.open(test_image_dir / BASE_IMAGE_1))
         test_im2 = usdu_utils.pil_to_tensor(Image.open(test_image_dir / BASE_IMAGE_2))
 
-        diff1 = (im1 - test_im1).abs().mean().item()
-        diff2 = (im2 - test_im2).abs().mean().item()
+        diff1 = img_tensor_diff(im1, test_im1)
+        diff2 = img_tensor_diff(im2, test_im2)
 
         assert diff1 < 0.015, f"Image 1 does not match test image. Diff: {diff1}"
         assert diff2 < 0.015, f"Image 2 does not match test image. Diff: {diff2}"
@@ -150,8 +150,8 @@ class TestMainWorkflow:
             Image.open(test_image_dir / UPSCALED_IMAGE_2)
         )
 
-        diff1 = (im1_upscaled - test_im1_upscaled).abs().mean().item()
-        diff2 = (im2_upscaled - test_im2_upscaled).abs().mean().item()
+        diff1 = img_tensor_diff(im1_upscaled, test_im1_upscaled)
+        diff2 = img_tensor_diff(im2_upscaled, test_im2_upscaled)
 
         # This tolerance is enough to handle both cpu and gpu as the device, as well as jpg compression differences.
         assert diff1 < 0.015, f"Upscaled Image 1 doesn't match. Diff: {diff1}"
