@@ -16,7 +16,7 @@ import pytest
 import asyncio
 import logging
 
-from helpers import SilenceLogs, execute
+from setup_utils import SilenceLogs, execute
 from configs import DirectoryConfig
 
 
@@ -150,7 +150,7 @@ def upscale_model(comfyui_initialized, node_classes):
     return model
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def test_dirs():
     """Return paths to test and sample image directories."""
     test_dir = REPO_ROOT / "test"
