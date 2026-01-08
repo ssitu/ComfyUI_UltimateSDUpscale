@@ -167,8 +167,6 @@ class TestMainWorkflow:
         # Save latent
         with torch.inference_mode():
             (latent, ) = execute(node_classes["VAEEncode"], vae=vae, pixels=upscaled[0:1])
-        from safetensors.torch import save_file
-        save_file(latent, sample_dir / "upscaled_latent.safetensors")
         return upscaled
 
     def test_upscale_with_custom_sampler(
