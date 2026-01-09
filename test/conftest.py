@@ -17,11 +17,25 @@ import asyncio
 import logging
 
 from setup_utils import SilenceLogs, execute
+from hf_downloader import download_test_images
 from configs import DirectoryConfig
+
+
+#
+# # Configuration
+#
+TEST_CHECKPOINT = "v1-5-pruned-emaonly-fp16.safetensors"
+TEST_UPSCALE_MODEL = "4x-UltraSharp.pth"
 
 
 def pytest_configure(config):
     """Called before test collection begins."""
+    # Download test images
+    download_test_images(
+        repo_id="ssitu/ultimatesdupscale_test",
+        save_dir="./test_images/",
+        repo_folder="test_images",
+    )
     # Ensure submodule root is in path for test imports
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
@@ -37,13 +51,6 @@ def pytest_configure(config):
     args.disable_all_custom_nodes = True
     # Assumes the name of the custom node folder is ComfyUI_UltimateSDUpscale
     args.whitelist_custom_nodes = ["ComfyUI_UltimateSDUpscale"]
-
-
-#
-# # Configuration
-#
-TEST_CHECKPOINT = "v1-5-pruned-emaonly-fp16.safetensors"
-TEST_UPSCALE_MODEL = "4x-UltraSharp.pth"
 
 
 #

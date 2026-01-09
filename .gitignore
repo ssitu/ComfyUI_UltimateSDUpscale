@@ -154,3 +154,4 @@ cython_debug/
 # Other
 *.ipynb
 *.code-workspace
+/test/test_images
