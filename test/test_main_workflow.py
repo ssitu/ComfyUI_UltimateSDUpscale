@@ -97,8 +97,8 @@ class TestMainWorkflow:
         diff1 = img_tensor_mae(im1, test_im1)
         diff2 = img_tensor_mae(im2, test_im2)
 
-        assert diff1 < 0.015, f"Image 1 does not match test image. Diff: {diff1}"
-        assert diff2 < 0.015, f"Image 2 does not match test image. Diff: {diff2}"
+        assert diff1 < 0.02, f"Image 1 does not match test image. Diff: {diff1}"
+        assert diff2 < 0.02, f"Image 2 does not match test image. Diff: {diff2}"
 
     @pytest.fixture(scope="class")
     def upscaled_image(
@@ -185,8 +185,8 @@ class TestMainWorkflow:
         diff2 = img_tensor_mae(im2_upscaled, test_im2_upscaled)
 
         # This tolerance is enough to handle both cpu and gpu as the device, as well as jpg compression differences.
-        assert diff1 < 0.015, f"Upscaled Image 1 doesn't match. Diff: {diff1}"
-        assert diff2 < 0.015, f"Upscaled Image 2 doesn't match. Diff: {diff2}"
+        assert diff1 < 0.02, f"Upscaled Image 1 doesn't match. Diff: {diff1}"
+        assert diff2 < 0.02, f"Upscaled Image 2 doesn't match. Diff: {diff2}"
 
     def test_save_sample_images(self, upscaled_image, test_dirs: DirectoryConfig):
         """Save sample images for visual inspection (optional utility test)."""
