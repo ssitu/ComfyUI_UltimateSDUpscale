@@ -5,13 +5,6 @@ Setup for the ComfyUI engine and shared test fixtures.
 import os
 import sys
 from pathlib import Path
-
-# Because of manipulations to sys.path, delayed imports are used to avoid issues
-
-# conftest.py is in repo_root/test/ directory
-REPO_ROOT = Path(__file__).parent.parent.resolve()
-COMFYUI_ROOT = REPO_ROOT.parent.parent.resolve()
-
 import pytest
 import asyncio
 import logging
@@ -19,6 +12,7 @@ import logging
 from setup_utils import SilenceLogs, execute
 from hf_downloader import download_test_images
 from configs import DirectoryConfig
+# Because of manipulations to sys.path, non-packaged imports should be delayed to avoid import issues
 
 
 #
@@ -26,6 +20,11 @@ from configs import DirectoryConfig
 #
 TEST_CHECKPOINT = "v1-5-pruned-emaonly-fp16.safetensors"
 TEST_UPSCALE_MODEL = "4x-UltraSharp.pth"
+SAMPLE_IMAGE_SUBDIR = "sample_images"
+TEST_IMAGE_SUBDIR = "test_images"
+# conftest.py is in repo_root/test/ directory
+REPO_ROOT = Path(__file__).parent.parent.resolve()
+COMFYUI_ROOT = REPO_ROOT.parent.parent.resolve()
 
 
 def pytest_configure(config):
@@ -161,8 +160,8 @@ def upscale_model(comfyui_initialized, node_classes):
 def test_dirs():
     """Return paths to test and sample image directories."""
     test_dir = REPO_ROOT / "test"
-    test_image_dir = test_dir / "test_images"
-    sample_image_dir = test_dir / "sample_images"
+    test_image_dir = test_dir / TEST_IMAGE_SUBDIR
+    sample_image_dir = test_dir / SAMPLE_IMAGE_SUBDIR
     sample_image_dir.mkdir(exist_ok=True)
     return DirectoryConfig(
         test_images=test_image_dir,
