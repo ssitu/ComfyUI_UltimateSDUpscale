@@ -6,7 +6,8 @@ This directory contains tests for ComfyUI_UltimateSDUpscale.
 
 - These tests assume that ComfyUI is installed using a virtual environment
 - Activate the ComfyUI virtual environment before running tests
-- The checkpoint `v1-5-pruned-emaonly-fp16.safetensors` is in the ComfyUI/models/checkpoints directory or in a directory defined by extra_model_paths.yaml
+- The checkpoint `v1-5-pruned-emaonly-fp16.safetensors` is available
+- The upscale model `4x-UltraSharp.pth` is available
 
 ## Running Tests
 
