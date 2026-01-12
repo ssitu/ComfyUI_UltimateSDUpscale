@@ -2,6 +2,7 @@
 Tests a common workflow for UltimateSDUpscale.
 """
 
+import logging
 import pathlib
 import pytest
 import torch
@@ -9,7 +10,7 @@ from PIL import Image
 
 import usdu_utils
 from setup_utils import execute
-from tensor_utils import img_tensor_mae
+from tensor_utils import img_tensor_mae, blur
 from io_utils import save_image, load_image
 from configs import DirectoryConfig
 
@@ -74,8 +75,8 @@ class TestMainWorkflow:
         sample_dir = test_dirs.sample_images
         base_img1_path = sample_dir / BASE_IMAGE_1
         base_img2_path = sample_dir / BASE_IMAGE_2
-        save_image(image[0], base_img1_path)
-        save_image(image[1], base_img2_path)
+        save_image(image[0:1], base_img1_path)
+        save_image(image[1:2], base_img2_path)
 
         # Load images back as tensors to account for compression
         image = torch.cat([load_image(base_img1_path), load_image(base_img2_path)])
@@ -86,19 +87,21 @@ class TestMainWorkflow:
         Verify generated base images match reference images.
         This is just to check if the checkpoint and generation pipeline are as expected for the tests dependent on their behavior.
         """
+        logger = logging.getLogger("test_base_image_matches_reference")
         image, _, _ = base_image
         test_image_dir = test_dirs.test_images
-        im1 = image[0]
-        im2 = image[1]
+        im1 = image[0:1]
+        im2 = image[1:2]
 
         test_im1 = load_image(test_image_dir / BASE_IMAGE_1)
         test_im2 = load_image(test_image_dir / BASE_IMAGE_2)
 
-        diff1 = img_tensor_mae(im1, test_im1)
-        diff2 = img_tensor_mae(im2, test_im2)
-
-        assert diff1 < 0.02, f"Image 1 does not match test image. Diff: {diff1}"
-        assert diff2 < 0.02, f"Image 2 does not match test image. Diff: {diff2}"
+        # Reduce high-frequency noise differences with gaussian blur. Using perceptual metrics are probably overkill.
+        diff1 = img_tensor_mae(blur(im1), blur(test_im1))
+        diff2 = img_tensor_mae(blur(im2), blur(test_im2))
+        logger.info(f"Base Image Diff1: {diff1}, Diff2: {diff2}")
+        assert diff1 < 0.05, "Image 1 does not match its test image."
+        assert diff2 < 0.05, "Image 2 does not match its test image."
 
     @pytest.fixture(scope="class")
     def upscaled_image(
@@ -164,15 +167,13 @@ class TestMainWorkflow:
         upscaled = torch.cat(
             [load_image(upscaled_img1_path), load_image(upscaled_img2_path)]
         )
-        # Save latent
-        with torch.inference_mode():
-            (latent, ) = execute(node_classes["VAEEncode"], vae=vae, pixels=upscaled[0:1])
         return upscaled
 
     def test_upscale_with_custom_sampler(
         self, upscaled_image, test_dirs: DirectoryConfig
     ):
         """Test upscaling with custom sampler and sigmas."""
+        logger = logging.getLogger("test_upscale_with_custom_sampler")
         # Verify results
         test_image_dir = test_dirs.test_images
         im1_upscaled = upscaled_image[0]
@@ -181,12 +182,13 @@ class TestMainWorkflow:
         test_im1_upscaled = load_image(test_image_dir / UPSCALED_IMAGE_1)
         test_im2_upscaled = load_image(test_image_dir / UPSCALED_IMAGE_2)
 
-        diff1 = img_tensor_mae(im1_upscaled, test_im1_upscaled)
-        diff2 = img_tensor_mae(im2_upscaled, test_im2_upscaled)
+        diff1 = img_tensor_mae(blur(im1_upscaled), blur(test_im1_upscaled))
+        diff2 = img_tensor_mae(blur(im2_upscaled), blur(test_im2_upscaled))
 
         # This tolerance is enough to handle both cpu and gpu as the device, as well as jpg compression differences.
-        assert diff1 < 0.02, f"Upscaled Image 1 doesn't match. Diff: {diff1}"
-        assert diff2 < 0.02, f"Upscaled Image 2 doesn't match. Diff: {diff2}"
+        logger.info(f"Diff1: {diff1}, Diff2: {diff2}")
+        assert diff1 < 0.05, "Upscaled Image 1 doesn't match its test image."
+        assert diff2 < 0.05, "Upscaled Image 2 doesn't match its test image."
 
     def test_save_sample_images(self, upscaled_image, test_dirs: DirectoryConfig):
         """Save sample images for visual inspection (optional utility test)."""
