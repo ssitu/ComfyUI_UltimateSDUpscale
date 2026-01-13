@@ -1,5 +1,6 @@
 import logging
 import re
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -33,24 +34,24 @@ def list_hf_files(
     try:
         html = _fetch_hf_html(repo_id, folder_path)
         pattern = rf'/datasets/{repo_id}/blob/main/({folder_path}/[^"]+?({"|".join(e for e in extensions)}))'
-        return [match[0] for match in re.findall(pattern, html)]
+        return [urllib.parse.unquote(match[0]) for match in re.findall(pattern, html)]
     except Exception as e:
         logging.error(f"Failed to list files in {folder_path}: {e}")
         return []
 
 
-def download_test_images(save_dir: str, repo_folder: str, repo_id: str) -> str:
+def download_test_images(save_dir: Path, repo_folder: str, repo_id: str) -> Path:
     """Download the test_images/ folder from the HF test dataset repo"""
     # Discover all subfolders and collect files
     subfolders = list_hf_subfolders(repo_id, repo_folder)
     if not subfolders:
         logging.warning(f"No subfolders found in {repo_folder}")
-        return str(save_dir)
+        return save_dir
 
     all_files = [f for folder in subfolders for f in list_hf_files(repo_id, folder)]
     if not all_files:
         logging.warning(f"No image files found in {repo_folder}")
-        return str(save_dir)
+        return save_dir
 
     logging.info(f"Found {len(all_files)} files from {len(subfolders)} folders")
     # Download files, preserving folder structure
@@ -72,13 +73,13 @@ def download_test_images(save_dir: str, repo_folder: str, repo_id: str) -> str:
         downloaded += 1
 
     logging.info(f"Downloaded {downloaded} files, skipped {skipped} existing files")
-    return str(save_dir_path)
+    return save_dir_path
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     download_test_images(
         repo_id="ssitu/ultimatesdupscale_test",
-        save_dir="./test/test_images/",
+        save_dir=Path("./test/test_images/"),
         repo_folder="test_images",
     )

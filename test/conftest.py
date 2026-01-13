@@ -32,7 +32,7 @@ def pytest_configure(config):
     # Download test images
     download_test_images(
         repo_id="ssitu/ultimatesdupscale_test",
-        save_dir="./test_images/",
+        save_dir=(REPO_ROOT / "test" / "test_images").resolve(),
         repo_folder="test_images",
     )
     # Ensure submodule root is in path for test imports
@@ -82,17 +82,11 @@ def _setup_comfyui_paths():
 # # Fixtures
 #
 @pytest.fixture(scope="session")
-def event_loop():
-    """Create an event loop for the test session."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="session")
 def comfyui_initialized():
     """Initialize ComfyUI nodes once per test session."""
     from nodes import init_extra_nodes
+
+    _setup_comfyui_paths()
 
     async def _init():
         with SilenceLogs():
@@ -169,7 +163,7 @@ def test_dirs():
     )
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="session")
 def seed():
     """Default seed for reproducible tests."""
     return 1

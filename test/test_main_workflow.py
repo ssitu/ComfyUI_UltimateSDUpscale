@@ -277,8 +277,3 @@ class TestMainWorkflow:
             seam_fix_denoise=0.5,
             filename_prefix=filename
         )
-
-
-# Allow running directly for debugging
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])
