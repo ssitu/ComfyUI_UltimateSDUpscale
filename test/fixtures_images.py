@@ -11,7 +11,7 @@ from io_utils import save_image, load_image
 
 # Image file names
 EXT = ".jpg"
-CATEGORY = pathlib.Path("main_workflow")
+CATEGORY = pathlib.Path("base_images")
 BASE_IMAGE_1_NAME = "main1_sd15" + EXT
 BASE_IMAGE_2_NAME = "main2_sd15" + EXT
 
