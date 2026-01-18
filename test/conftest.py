@@ -26,6 +26,18 @@ TEST_IMAGE_SUBDIR = "test_images"
 REPO_ROOT = Path(__file__).parent.parent.resolve()
 COMFYUI_ROOT = REPO_ROOT.parent.parent.resolve()
 
+# Make sure the repo root is in sys.path for imports
+# Ensure submodule root is in path for test imports
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+# Ensure ComfyUI path is set up
+if str(COMFYUI_ROOT) not in sys.path:
+    sys.path.insert(0, str(COMFYUI_ROOT))
+
+
+# Session scoped fixtures
+from fixtures_images import base_image
+
 
 def pytest_configure(config):
     """Called before test collection begins."""
@@ -35,13 +47,6 @@ def pytest_configure(config):
         save_dir=(REPO_ROOT / "test" / "test_images").resolve(),
         repo_folder="test_images",
     )
-    # Ensure submodule root is in path for test imports
-    if str(REPO_ROOT) not in sys.path:
-        sys.path.insert(0, str(REPO_ROOT))
-
-    # Ensure ComfyUI path is set up
-    if str(COMFYUI_ROOT) not in sys.path:
-        sys.path.insert(0, str(COMFYUI_ROOT))
 
     from comfy.cli_args import args
 
