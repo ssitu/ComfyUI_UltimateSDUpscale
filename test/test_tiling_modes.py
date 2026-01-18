@@ -9,7 +9,8 @@ import torch
 
 from tensor_utils import img_tensor_mae, blur
 from io_utils import save_image, load_image
-from fixtures_images import base_image, EXT
+from configs import DirectoryConfig
+from fixtures_images import EXT
 
 # Image file names
 CATEGORY = pathlib.Path(pathlib.Path(__file__).stem.removeprefix("test_"))
@@ -25,10 +26,9 @@ class TestTilingModes:
         self,
         base_image,
         loaded_checkpoint,
-        upscale_model,
         node_classes,
         seed,
-        test_dirs,
+        test_dirs: DirectoryConfig,
         mode_type,
         seam_fix_mode,
         seam_fix_denoise,
@@ -88,18 +88,16 @@ class TestTilingModes:
         self,
         base_image,
         loaded_checkpoint,
-        upscale_model,
         node_classes,
         seed,
         mode_type,
-        test_dirs,
+        test_dirs: DirectoryConfig,
     ):
         """Test different tiling mode types."""
         filename = image_name_format("mode", mode_type)
         self._test_upscale_variant(
             base_image,
             loaded_checkpoint,
-            upscale_model,
             node_classes,
             seed,
             test_dirs,
@@ -116,18 +114,16 @@ class TestTilingModes:
         self,
         base_image,
         loaded_checkpoint,
-        upscale_model,
         node_classes,
         seed,
         seam_fix_mode,
-        test_dirs,
+        test_dirs: DirectoryConfig,
     ):
         """Test different seam fix modes."""
         filename = image_name_format("seamfix", seam_fix_mode)
         self._test_upscale_variant(
             base_image,
             loaded_checkpoint,
-            upscale_model,
             node_classes,
             seed,
             test_dirs,

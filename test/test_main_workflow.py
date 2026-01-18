@@ -4,14 +4,13 @@ Tests a common workflow for UltimateSDUpscale.
 
 import logging
 import pathlib
-import pytest
 import torch
 
 from setup_utils import execute
 from tensor_utils import img_tensor_mae, blur
 from io_utils import save_image, load_image
 from configs import DirectoryConfig
-from fixtures_images import base_image, EXT
+from fixtures_images import EXT
 
 # Image file names
 CATEGORY = pathlib.Path(pathlib.Path(__file__).stem.removeprefix("test_"))
@@ -33,7 +32,7 @@ class TestMainWorkflow:
         upscale_model,
         node_classes,
         seed,
-        test_dirs,
+        test_dirs: DirectoryConfig,
     ):
         """Generate upscaled images using standard workflow."""
         image, positive, negative = base_image
@@ -99,10 +98,9 @@ class TestMainWorkflow:
         self,
         base_image,
         loaded_checkpoint,
-        upscale_model,
         node_classes,
         seed,
-        test_dirs,
+        test_dirs: DirectoryConfig,
     ):
         """Generate upscaled images using standard workflow using the no upscale node."""
         image, positive, negative = base_image
@@ -174,7 +172,7 @@ class TestMainWorkflow:
         upscale_model,
         node_classes,
         seed,
-        test_dirs,
+        test_dirs: DirectoryConfig,
     ):
         """Generate upscaled images using standard workflow using the custom sampler node."""
         image, positive, negative = base_image

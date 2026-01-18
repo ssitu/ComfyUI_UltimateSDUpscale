@@ -11,7 +11,7 @@ from setup_utils import execute
 from tensor_utils import img_tensor_mae, blur
 from io_utils import save_image, load_image
 from configs import DirectoryConfig
-from fixtures_images import base_image, EXT
+from fixtures_images import EXT
 
 CATEGORY = pathlib.Path(pathlib.Path(__file__).stem.removeprefix("test_"))
 CONTROLNET_TILE_OUTPUT_IMAGE = "controlnet_tile" + EXT

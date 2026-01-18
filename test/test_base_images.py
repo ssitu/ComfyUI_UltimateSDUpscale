@@ -6,7 +6,7 @@ import logging
 from configs import DirectoryConfig
 from tensor_utils import img_tensor_mae, blur
 from io_utils import load_image
-from fixtures_images import base_image, BASE_IMAGE_1, BASE_IMAGE_2
+from fixtures_images import BASE_IMAGE_1, BASE_IMAGE_2
 
 
 def test_base_image_matches_reference(base_image, test_dirs: DirectoryConfig):

@@ -8,6 +8,7 @@ import torch
 
 from setup_utils import execute
 from io_utils import save_image, load_image
+from configs import DirectoryConfig
 
 # Image file names
 EXT = ".jpg"
@@ -21,7 +22,7 @@ BASE_IMAGE_2 = CATEGORY / BASE_IMAGE_2_NAME
 
 
 @pytest.fixture(scope="session")
-def base_image(loaded_checkpoint, seed, test_dirs, node_classes):
+def base_image(loaded_checkpoint, seed, test_dirs: DirectoryConfig, node_classes):
     """Generate a base image for upscaling tests."""
     EmptyLatentImage = node_classes["EmptyLatentImage"]
     CLIPTextEncode = node_classes["CLIPTextEncode"]
