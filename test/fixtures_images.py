@@ -8,10 +8,11 @@ import torch
 
 from setup_utils import execute
 from io_utils import save_image, load_image
+from configs import DirectoryConfig
 
 # Image file names
 EXT = ".jpg"
-CATEGORY = pathlib.Path("main_workflow")
+CATEGORY = pathlib.Path("base_images")
 BASE_IMAGE_1_NAME = "main1_sd15" + EXT
 BASE_IMAGE_2_NAME = "main2_sd15" + EXT
 
@@ -21,7 +22,7 @@ BASE_IMAGE_2 = CATEGORY / BASE_IMAGE_2_NAME
 
 
 @pytest.fixture(scope="session")
-def base_image(loaded_checkpoint, seed, test_dirs, node_classes):
+def base_image(loaded_checkpoint, seed, test_dirs: DirectoryConfig, node_classes):
     """Generate a base image for upscaling tests."""
     EmptyLatentImage = node_classes["EmptyLatentImage"]
     CLIPTextEncode = node_classes["CLIPTextEncode"]
@@ -31,9 +32,7 @@ def base_image(loaded_checkpoint, seed, test_dirs, node_classes):
     model, clip, vae = loaded_checkpoint
 
     with torch.inference_mode():
-        (empty_latent,) = execute(
-            EmptyLatentImage, width=512, height=512, batch_size=2
-        )
+        (empty_latent,) = execute(EmptyLatentImage, width=512, height=512, batch_size=2)
 
         (positive,) = execute(
             CLIPTextEncode,

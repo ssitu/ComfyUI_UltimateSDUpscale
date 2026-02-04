@@ -22,4 +22,6 @@ def blur(tensor, kernel_size=9, sigma=None):
         tensor = tensor.permute(2, 0, 1).unsqueeze(0)
     else:
         raise ValueError(f"Expected a 3D or 4D tensor, got {tensor.ndim=}")
-    return TF.gaussian_blur(tensor, kernel_size=kernel_size, sigma=sigma).permute(0, 2, 3, 1)  # type: ignore
+    return TF.gaussian_blur(tensor, kernel_size=kernel_size, sigma=sigma).permute(  # type: ignore
+        0, 2, 3, 1
+    )
