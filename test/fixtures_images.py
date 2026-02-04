@@ -32,9 +32,7 @@ def base_image(loaded_checkpoint, seed, test_dirs: DirectoryConfig, node_classes
     model, clip, vae = loaded_checkpoint
 
     with torch.inference_mode():
-        (empty_latent,) = execute(
-            EmptyLatentImage, width=512, height=512, batch_size=2
-        )
+        (empty_latent,) = execute(EmptyLatentImage, width=512, height=512, batch_size=2)
 
         (positive,) = execute(
             CLIPTextEncode,
