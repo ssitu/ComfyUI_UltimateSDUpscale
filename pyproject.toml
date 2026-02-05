@@ -1,7 +1,7 @@
 [project]
 name = "comfyui_ultimatesdupscale"
 description = "ComfyUI nodes for the Ultimate Stable Diffusion Upscale script by Coyote-A."
-version = "1.6.3-dev"
+version = "1.6.4-dev"
 license = { file = "LICENSE" }
 
 [project.optional-dependencies]
@@ -18,7 +18,7 @@ Repository = "https://github.com/ssitu/ComfyUI_UltimateSDUpscale"
 PublisherId = "ssit"
 DisplayName = "ComfyUI_UltimateSDUpscale"
 Icon = ""
-includes = ["repositories/ultimate_sd_upscale/"]
+includes = ["/repositories/ultimate_sd_upscale/"]
 
 [tool.setuptools.packages.find]
 where = ["."]
