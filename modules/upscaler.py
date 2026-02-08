@@ -1,5 +1,5 @@
 from PIL import Image
-from utils import tensor_to_pil, pil_to_tensor
+from usdu_utils import tensor_to_pil, pil_to_tensor
 from comfy_extras.nodes_upscale_model import ImageUpscaleWithModel
 from modules import shared
 
