@@ -140,6 +140,7 @@ class UltimateSDUpscale:
         # Store batch_size for use in processing
         self.batch_size = batch_size
         print(f"[USDU Batch Debug] UltimateSDUpscale.upscale() using batch_size={batch_size}")
+        assert batch_size == 1 or force_uniform_tiles, "batch_size greater than 1 requires force_uniform_tiles to be True; all tiles in the batch must be the same size."
 
         # Processing
         sdprocessing = StableDiffusionProcessing(
