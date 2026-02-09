@@ -27,5 +27,5 @@ def test_base_image_matches_reference(base_image, test_dirs: DirectoryConfig):
     diff1 = img_tensor_mae(blur(im1), blur(test_im1))
     diff2 = img_tensor_mae(blur(im2), blur(test_im2))
     logger.info(f"Base Image Diff1: {diff1}, Diff2: {diff2}")
-    assert diff1 < 0.05, "Image 1 does not match its test image."
-    assert diff2 < 0.05, "Image 2 does not match its test image."
+    assert diff1 < 0.01, "Image 1 does not match its test image."
+    assert diff2 < 0.01, "Image 2 does not match its test image."
