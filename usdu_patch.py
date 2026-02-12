@@ -250,27 +250,28 @@ def _prepare_tile_for_batch(calc_rectangle_fn, current_image: Image.Image, tx: i
 
 
 def _process_batch_tiles(p,
-                         tiles_coords: Iterable[Tuple[int, int]],
-                         current_image: Image.Image,
+                         tiles_coords: List[Tuple[int, int]],
+                         images: List[Image.Image],
                          calc_rectangle_fn,
                          vae_encoder: VAEEncode,
                          vae_decoder: VAEDecode,
-                         vae_decoder_tiled: VAEDecodeTiled) -> Image.Image:
-    """Encode, sample and decode a batch of tiles and composite them into current_image."""
-    if not tiles_coords:
-        return current_image
+                         vae_decoder_tiled: VAEDecodeTiled) -> List[Image.Image]:
+    """Encode, sample and decode a batch of tiles and composite them into the given images."""
+    if not tiles_coords or not images:
+        return images
 
     batch_tiles = []
     batch_masks = []
     batch_crop_regions = []
     batch_tile_sizes = []
 
-    for tx, ty in tiles_coords:
-        cropped_tile, initial_tile_size, tile_mask, crop_region, tile_size = _prepare_tile_for_batch(calc_rectangle_fn, current_image, tx, ty, p)
-        batch_tiles.append((cropped_tile, initial_tile_size))
-        batch_masks.append(tile_mask)
-        batch_crop_regions.append(crop_region)
-        batch_tile_sizes.append(tile_size)
+    for image in images:
+        for tx, ty in tiles_coords:
+            cropped_tile, initial_tile_size, tile_mask, crop_region, tile_size = _prepare_tile_for_batch(calc_rectangle_fn, image, tx, ty, p)
+            batch_tiles.append((cropped_tile, initial_tile_size))
+            batch_masks.append(tile_mask)
+            batch_crop_regions.append(crop_region)
+            batch_tile_sizes.append(tile_size)
 
     # Encode tiles -> latent
     batched_tensors = torch.cat([usdu_utils.pil_to_tensor(tile) for tile, _ in batch_tiles], dim=0)
@@ -278,8 +279,8 @@ def _process_batch_tiles(p,
 
     # Condition from first tile (assume same)
     first_tile_size = batch_tile_sizes[0]
-    positive_cropped = usdu_utils.crop_cond(p.positive, batch_crop_regions, p.init_size, current_image.size, first_tile_size)
-    negative_cropped = usdu_utils.crop_cond(p.negative, batch_crop_regions, p.init_size, current_image.size, first_tile_size)
+    positive_cropped = usdu_utils.crop_cond(p.positive, batch_crop_regions, p.init_size, images[0].size, first_tile_size)
+    negative_cropped = usdu_utils.crop_cond(p.negative, batch_crop_regions, p.init_size, images[0].size, first_tile_size)
 
     # Sampling
     samples = _sample(p.model, p.seed, p.steps, p.cfg, p.sampler_name, p.scheduler,
@@ -297,29 +298,32 @@ def _process_batch_tiles(p,
         (decoded,) = vae_decoder_tiled.decode(p.vae, samples, 512)
 
     # Composite tiles back
-    result_img = current_image
-    for idx, (tx, ty) in enumerate(tiles_coords):
-        tile_sampled = usdu_utils.tensor_to_pil(decoded, idx)
-        initial_tile_size = batch_tiles[idx][1]
-        crop_region = batch_crop_regions[idx]
-        tile_mask = batch_masks[idx]
+    result_imgs = images
+    for i, result_img in enumerate(result_imgs):
+        for j, (tx, ty) in enumerate(tiles_coords):
+            idx = i * len(tiles_coords) + j
+            tile_sampled = usdu_utils.tensor_to_pil(decoded, idx)
+            initial_tile_size = batch_tiles[idx][1]
+            crop_region = batch_crop_regions[idx]
+            tile_mask = batch_masks[idx]
 
-        if tile_sampled.size != initial_tile_size:
-            tile_sampled = tile_sampled.resize(initial_tile_size, Image.Resampling.LANCZOS)
+            if tile_sampled.size != initial_tile_size:
+                tile_sampled = tile_sampled.resize(initial_tile_size, Image.Resampling.LANCZOS)
 
-        image_tile_only = Image.new('RGBA', result_img.size)
-        image_tile_only.paste(tile_sampled, crop_region[:2])
+            image_tile_only = Image.new('RGBA', result_img.size)
+            image_tile_only.paste(tile_sampled, crop_region[:2])
 
-        # Add mask as alpha and composite
-        temp = image_tile_only.copy()
-        temp.putalpha(tile_mask)
-        image_tile_only.paste(temp, image_tile_only)
+            # Add mask as alpha and composite
+            temp = image_tile_only.copy()
+            temp.putalpha(tile_mask)
+            image_tile_only.paste(temp, image_tile_only)
 
-        result = result_img.convert('RGBA')
-        result.alpha_composite(image_tile_only)
-        result_img = result.convert('RGB')
+            result = result_img.convert('RGBA')
+            result.alpha_composite(image_tile_only)
+            result_img = result.convert('RGB')
+            result_imgs[i] = result_img
 
-    return result_img
+    return result_imgs
 
 
 # -------------------------
@@ -357,13 +361,10 @@ def patch_usdu_linear_and_chess_process():
                 if len(tiles_to_process) >= batch_size or (yi == rows - 1 and xi == cols - 1):
                     batch_count += 1
                     logger.info("[USDU Batch Debug] Processing batch #%s with %s tiles: %s", batch_count, len(tiles_to_process), tiles_to_process)
-                    image = _process_batch_tiles(p, tiles_to_process, image, self.calc_rectangle, vae_encoder, vae_decoder, vae_decoder_tiled)
+                    shared.batch = _process_batch_tiles(p, tiles_to_process, shared.batch, self.calc_rectangle, vae_encoder, vae_decoder, vae_decoder_tiled)
                     tiles_to_process = []
 
         logger.info("[USDU Batch Debug] Linear processing complete. Processed %s batches total.", batch_count)
-
-        # Update shared.batch[0] with the processed image so it can be retrieved later
-        shared.batch[0] = image
 
         p.width = image.width
         p.height = image.height
@@ -407,13 +408,10 @@ def patch_usdu_linear_and_chess_process():
                     break
                 tiles_to_process.append((tx, ty))
                 if len(tiles_to_process) >= batch_size:
-                    image = _process_batch_tiles(p, tiles_to_process, image, self.calc_rectangle, vae_encoder, vae_decoder, vae_decoder_tiled)
+                    shared.batch = _process_batch_tiles(p, tiles_to_process, shared.batch, self.calc_rectangle, vae_encoder, vae_decoder, vae_decoder_tiled)
                     tiles_to_process = []
             if tiles_to_process:
-                image = _process_batch_tiles(p, tiles_to_process, image, self.calc_rectangle, vae_encoder, vae_decoder, vae_decoder_tiled)
-
-        # Update shared.batch[0] with the processed image so it can be retrieved later
-        shared.batch[0] = image
+                shared.batch = _process_batch_tiles(p, tiles_to_process, shared.batch, self.calc_rectangle, vae_encoder, vae_decoder, vae_decoder_tiled)
 
         p.width = image.width
         p.height = image.height
