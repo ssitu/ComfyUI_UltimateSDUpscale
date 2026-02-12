@@ -295,19 +295,40 @@ def resize_and_pad_tensor(tensor, width, height, fill=False, blur=False):
     return result
 
 
-def crop_controlnet(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad):
+def crop_controlnet(cond_dict, regions, init_size, canvas_size, tile_size, w_pad, h_pad):
+    """
+    Crop controlnet hints to the given region and resize them to the tile size.
+    If there are multiple regions, the hints will be cropped and resized for each region
+    and concatenated together in the batch dimension.
+
+    Supports multiple regions.
+
+    :param cond_dict: dict that contains the conditioning.
+    :param regions: A tuple or list of tuples of the form (x1, y1, x2, y2) denoting the
+        upper left and the lower right points of the rectangular region.
+    :param init_size: The original size of the image that the controlnet hints were generated for.
+    :param canvas_size: The size of the image that the controlnet hints will be resized to before cropping.
+    :param tile_size: The size to which each cropped hint will be resized.
+    :param w_pad: The horizontal padding added to each cropped hint.
+    :param h_pad: The vertical padding added to each cropped hint.
+    """
     if "control" not in cond_dict:
         return
+    if not isinstance(regions, list):
+        regions = [regions]
     c = cond_dict["control"]
     controlnet = c.copy()
     cond_dict["control"] = controlnet
     while c is not None:
         # hint is shape (B, C, H, W)
         hint = controlnet.cond_hint_original
-        resized_crop = resize_region(region, canvas_size, hint.shape[:-3:-1])
-        hint = crop_tensor(hint.movedim(1, -1), resized_crop).movedim(-1, 1)
-        hint = resize_tensor(hint, tile_size[::-1])
-        controlnet.cond_hint_original = hint
+        tiled_hints = []
+        for region in regions:
+            resized_crop = resize_region(region, canvas_size, hint.shape[:-3:-1])
+            tiled_hint = crop_tensor(hint.movedim(1, -1), resized_crop).movedim(-1, 1)
+            tiled_hint = resize_tensor(tiled_hint, tile_size[::-1])
+            tiled_hints.append(tiled_hint)
+        controlnet.cond_hint_original = torch.cat(tiled_hints, dim=0)
         c = c.previous_controlnet
         controlnet.set_previous_controlnet(c.copy() if c is not None else None)
         controlnet = controlnet.previous_controlnet
@@ -333,9 +354,18 @@ def region_intersection(region1, region2):
     return (x1, y1, x2, y2)
 
 
-def crop_gligen(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad):
+def crop_gligen(cond_dict, regions, init_size, canvas_size, tile_size, w_pad, h_pad):
+    """
+    Crop gligen position conditioning to the given region.
+
+    Does not support multiple regions.
+    """
     if "gligen" not in cond_dict:
         return
+
+    # Only use first region if multiple regions are given
+    region = regions if isinstance(regions, tuple) else regions[0]
+
     type, model, cond = cond_dict["gligen"]
     if type != "position":
         from warnings import warn
@@ -379,9 +409,17 @@ def crop_gligen(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_p
     cond_dict["gligen"] = (type, model, cropped)
 
 
-def crop_area(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad):
+def crop_area(cond_dict, regions, init_size, canvas_size, tile_size, w_pad, h_pad):
+    """
+    Crop area conditioning to the given region.
+
+    Does not support multiple regions.
+    """
     if "area" not in cond_dict:
         return
+
+    # Only use first region if multiple regions are given
+    region = regions if isinstance(regions, tuple) else regions[0]
 
     # Resize the area conditioning to the canvas size and confine it to the tile region
     h, w, y, x = cond_dict["area"]
@@ -413,9 +451,18 @@ def crop_area(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad
     cond_dict["area"] = (h, w, y, x)
 
 
-def crop_mask(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad):
+def crop_mask(cond_dict, regions, init_size, canvas_size, tile_size, w_pad, h_pad):
+    """
+    Crop the mask conditioning to the given region
+
+    Does not support multiple regions.
+    """
     if "mask" not in cond_dict:
         return
+
+    # Only use first region if multiple regions are given
+    region = regions if isinstance(regions, tuple) else regions[0]
+
     mask_tensor = cond_dict["mask"]  # (B, H, W)
     masks = []
     for i in range(mask_tensor.shape[0]):
@@ -443,17 +490,22 @@ def crop_mask(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad
     cond_dict["mask"] = torch.cat(masks, dim=0)  # (B, H, W)
 
 # Added Flux-Kontext Support crop_reference_latents by TBG ETUR
-def crop_reference_latents(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad):
+def crop_reference_latents(cond_dict, regions, init_size, canvas_size, tile_size, w_pad, h_pad):
     """
     1. Resize each latent to `canvas_size` in latent units.
     2. Crop the rectangle `region` (pixel coordinates).
     3. Down-sample the crop to latent-space `tile_size`.
     Expects a list of BCHW tensors under "reference_latents".
+
+    Does not support multiple regions.
     """
 
     latents = cond_dict.get("reference_latents")
     if not isinstance(latents, list):
         return  # nothing to do
+
+    # Only use first region if multiple regions are given
+    region = regions if isinstance(regions, tuple) else regions[0]
 
     k = 8  # down-sample factor from pixel space → latent space (SD-type models)
 
@@ -503,15 +555,15 @@ def crop_reference_latents(cond_dict, region, init_size, canvas_size, tile_size,
 
 
 
-def crop_cond(cond, region, init_size, canvas_size, tile_size, w_pad=0, h_pad=0):
+def crop_cond(cond, regions, init_size, canvas_size, tile_size, w_pad=0, h_pad=0):
     cropped = []
     for emb, x in cond:
         cond_dict = x.copy()
         n = [emb, cond_dict]
-        crop_controlnet(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad)
-        crop_gligen(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad)
-        crop_area(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad)
-        crop_mask(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad)
-        crop_reference_latents(cond_dict, region, init_size, canvas_size, tile_size, w_pad, h_pad)
+        crop_controlnet(cond_dict, regions, init_size, canvas_size, tile_size, w_pad, h_pad)
+        crop_gligen(cond_dict, regions, init_size, canvas_size, tile_size, w_pad, h_pad)
+        crop_area(cond_dict, regions, init_size, canvas_size, tile_size, w_pad, h_pad)
+        crop_mask(cond_dict, regions, init_size, canvas_size, tile_size, w_pad, h_pad)
+        crop_reference_latents(cond_dict, regions, init_size, canvas_size, tile_size, w_pad, h_pad)
         cropped.append(n)
     return cropped

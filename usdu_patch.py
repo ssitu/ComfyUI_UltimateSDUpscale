@@ -277,10 +277,9 @@ def _process_batch_tiles(p,
     (latent,) = vae_encoder.encode(p.vae, batched_tensors)
 
     # Condition from first tile (assume same)
-    first_crop_region = batch_crop_regions[0]
     first_tile_size = batch_tile_sizes[0]
-    positive_cropped = usdu_utils.crop_cond(p.positive, first_crop_region, p.init_size, current_image.size, first_tile_size)
-    negative_cropped = usdu_utils.crop_cond(p.negative, first_crop_region, p.init_size, current_image.size, first_tile_size)
+    positive_cropped = usdu_utils.crop_cond(p.positive, batch_crop_regions, p.init_size, current_image.size, first_tile_size)
+    negative_cropped = usdu_utils.crop_cond(p.negative, batch_crop_regions, p.init_size, current_image.size, first_tile_size)
 
     # Sampling
     samples = _sample(p.model, p.seed, p.steps, p.cfg, p.sampler_name, p.scheduler,
