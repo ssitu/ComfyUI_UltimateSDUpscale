@@ -49,7 +49,7 @@ class TestMainWorkflow:
                 cfg=8,
                 sampler_name="euler",
                 scheduler="normal",
-                denoise=0.6,
+                denoise=0.7,
                 upscale_model=upscale_model,
                 mode_type="Chess",
                 tile_width=512,
@@ -125,7 +125,7 @@ class TestMainWorkflow:
                 cfg=8,
                 sampler_name="euler",
                 scheduler="normal",
-                denoise=0.6,
+                denoise=0.7,
                 mode_type="Chess",
                 tile_width=512,
                 tile_height=512,
@@ -185,8 +185,8 @@ class TestMainWorkflow:
         with torch.inference_mode():
             # Setup custom scheduler and sampler
             custom_scheduler = node_classes["KarrasScheduler"]
-            (sigmas,) = execute(custom_scheduler, 9, 14.614642, 0.0291675, 7.0)
-            (_, sigmas) = execute(node_classes["SplitSigmasDenoise"], sigmas, 0.6)
+            (sigmas,) = execute(custom_scheduler, 10, 14.614642, 0.0291675, 7.0)
+            (_, sigmas) = execute(node_classes["SplitSigmasDenoise"], sigmas, 0.7)
 
             custom_sampler = node_classes["KSamplerSelect"]
             (sampler,) = execute(custom_sampler, "dpmpp_2m")
