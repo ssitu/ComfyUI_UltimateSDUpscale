@@ -28,6 +28,7 @@ SEAM_FIX_MODES = {
 def USDU_base_inputs():
     required = [
         ("image", ("IMAGE", {"tooltip": "The image to upscale."})),
+        ("enable", ("BOOLEAN", {"default": True, "tooltip": "If False, bypass the node and return the input image unchanged."})),
         # Sampling Params
         ("model", ("MODEL", {"tooltip": "The model to use for image-to-image."})),
         ("positive", ("CONDITIONING", {"tooltip": "The positive conditioning for each tile."})),
@@ -103,12 +104,16 @@ class UltimateSDUpscale:
     OUTPUT_TOOLTIPS = ("The final upscaled image.",)
     DESCRIPTION = "Upscales an image and runs image-to-image on tiles from the input image."
 
-    def upscale(self, image, model, positive, negative, vae, upscale_by, seed,
+    def upscale(self, image, enable, model, positive, negative, vae, upscale_by, seed,
                 steps, cfg, sampler_name, scheduler, denoise, upscale_model,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
-                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode, 
+                seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode,
                 custom_sampler=None, custom_sigmas=None):
+        # Bypass if enable is False
+        if not enable:
+            return (image,)
+
         # Store params
         self.tile_width = tile_width
         self.tile_height = tile_height
@@ -184,13 +189,13 @@ class UltimateSDUpscaleNoUpscale(UltimateSDUpscale):
     OUTPUT_TOOLTIPS = ("The final refined image.",)
     DESCRIPTION = "Runs image-to-image on tiles from the input image."
 
-    def upscale(self, upscaled_image, model, positive, negative, vae, seed,
+    def upscale(self, upscaled_image, enable, model, positive, negative, vae, seed,
                 steps, cfg, sampler_name, scheduler, denoise,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
                 seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode):
         upscale_by = 1.0
-        return super().upscale(upscaled_image, model, positive, negative, vae, upscale_by, seed,
+        return super().upscale(upscaled_image, enable, model, positive, negative, vae, upscale_by, seed,
                                steps, cfg, sampler_name, scheduler, denoise, None,
                                mode_type, tile_width, tile_height, mask_blur, tile_padding,
                                seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
@@ -212,14 +217,14 @@ class UltimateSDUpscaleCustomSample(UltimateSDUpscale):
     OUTPUT_TOOLTIPS = ("The final upscaled image.",)
     DESCRIPTION = "Runs image-to-image on tiles from the input image."
 
-    def upscale(self, image, model, positive, negative, vae, upscale_by, seed,
+    def upscale(self, image, enable, model, positive, negative, vae, upscale_by, seed,
                 steps, cfg, sampler_name, scheduler, denoise,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
                 seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode,
                 upscale_model=None,
                 custom_sampler=None, custom_sigmas=None):
-        return super().upscale(image, model, positive, negative, vae, upscale_by, seed,
+        return super().upscale(image, enable, model, positive, negative, vae, upscale_by, seed,
                 steps, cfg, sampler_name, scheduler, denoise, upscale_model,
                 mode_type, tile_width, tile_height, mask_blur, tile_padding,
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
