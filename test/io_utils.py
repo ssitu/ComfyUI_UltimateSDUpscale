@@ -18,3 +18,9 @@ def save_image(tensor, path: pathlib.Path):
 def load_image(path: pathlib.Path, device=None):
     """Load an image from disk and convert it to a tensor."""
     return usdu_utils.pil_to_tensor(Image.open(path)).to(device=device)
+
+
+def image_name_format(name: str, extension: str, batch_size: int = 1) -> str:
+    """Helper for building image names for tests."""
+    batch_suffix = f"_batch{batch_size}" if batch_size > 1 else ""
+    return f"{name}{batch_suffix}{extension}"

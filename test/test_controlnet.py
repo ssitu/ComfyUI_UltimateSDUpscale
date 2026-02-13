@@ -9,27 +9,26 @@ import torch
 
 from setup_utils import execute
 from tensor_utils import img_tensor_mae, blur
-from io_utils import save_image, load_image
+from io_utils import save_image, load_image, image_name_format
 from configs import DirectoryConfig
 from fixtures_images import EXT
 
 CATEGORY = pathlib.Path(pathlib.Path(__file__).stem.removeprefix("test_"))
-CONTROLNET_TILE_OUTPUT_IMAGE = "controlnet_tile" + EXT
 TEST_CONTROLNET_TILE_MODEL = "control_v11f1e_sd15_tile.pth"
 
 
+@pytest.mark.parametrize("batch_size", [1, 2])
 class TestControlNet:
     """Integration tests for the upscaling workflow with ControlNet."""
 
-    @pytest.fixture(scope="class")
-    def controlnet_upscaled_image(
+    def test_controlnet_tile(
         self,
         base_image,
         loaded_checkpoint,
-        upscale_model,
         node_classes,
         seed,
-        test_dirs,
+        batch_size,
+        test_dirs: DirectoryConfig,
     ):
         """Generate upscaled images using ControlNet."""
         image, positive, negative = base_image
@@ -72,25 +71,20 @@ class TestControlNet:
                 seam_fix_padding=16,
                 force_uniform_tiles=True,
                 tiled_decode=False,
+                batch_size=batch_size,
             )
         # Save and reload sample image
         sample_dir = test_dirs.sample_images
-        filename = CATEGORY / CONTROLNET_TILE_OUTPUT_IMAGE
+        filename = CATEGORY / image_name_format("controlnet_tile", EXT, batch_size)
         save_image(upscaled[0], sample_dir / filename)
         upscaled = load_image(sample_dir / filename)
-        return upscaled
 
-    def test_controlnet_upscaled_image_matches_reference(
-        self, controlnet_upscaled_image, test_dirs: DirectoryConfig
-    ):
-        """
-        Verify ControlNet upscaled images match reference images.
-        """
-        logger = logging.getLogger("test_controlnet_upscaled_image_matches_reference")
+        # Verify against reference image
+        logger = logging.getLogger("test_controlnet_tile")
         test_img_dir = test_dirs.test_images
-        test_img = load_image(test_img_dir / CATEGORY / CONTROLNET_TILE_OUTPUT_IMAGE)
+        test_img = load_image(test_img_dir / filename)
 
         # Reduce high-frequency noise differences with gaussian blur
-        diff = img_tensor_mae(blur(controlnet_upscaled_image), blur(test_img))
+        diff = img_tensor_mae(blur(upscaled), blur(test_img))
         logger.info(f"ControlNet Upscaled Image Diff: {diff}")
-        assert diff < 0.05, "ControlNet upscaled image does not match its test image."
+        assert diff < 0.01, "ControlNet upscaled image does not match its test image."
