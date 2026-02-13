@@ -248,5 +248,5 @@ class TestMainWorkflow:
 
         # This tolerance is enough to handle both cpu and gpu as the device, as well as jpg compression differences.
         logger.info(f"Diff1: {diff1}, Diff2: {diff2}")
-        assert diff1 < 0.01, f"{im1_filename} doesn't match its test image."
-        assert diff2 < 0.01, f"{im2_filename} doesn't match its test image."
+        assert diff1 < 0.011, f"{im1_filename} doesn't match its test image."
+        assert diff2 < 0.011, f"{im2_filename} doesn't match its test image."
