@@ -1,4 +1,5 @@
 from PIL import Image, ImageFilter
+import logging
 import torch
 import math
 from nodes import common_ksampler, VAEEncode, VAEDecode, VAEDecodeTiled
@@ -10,6 +11,9 @@ import comfy.utils as comfy_utils
 from enum import Enum
 import json
 import os
+from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 if (not hasattr(Image, 'Resampling')):  # For older versions of Pillow
     Image.Resampling = Image
@@ -54,7 +58,7 @@ class StableDiffusionProcessing:
     ):
         # Variables used by the USDU script
         self.init_images = [init_img]
-        self.image_mask = None
+        self.image_mask = Image.new('L', init_img.size, 0)  # Placeholder mask
         self.mask_blur = 0
         self.inpaint_full_res_padding = 0
         self.width = init_img.width * upscale_by
@@ -79,7 +83,7 @@ class StableDiffusionProcessing:
         self.custom_sigmas = custom_sigmas
 
         if (custom_sampler is not None) ^ (custom_sigmas is not None):
-            print("[USDU] Both custom sampler and custom sigmas must be provided, defaulting to widget sampler and sigmas")
+            logger.warning("Both custom sampler and custom sigmas must be provided, defaulting to widget sampler and sigmas")
 
         # Variables used only by this script
         self.init_size = init_img.width, init_img.height
@@ -92,7 +96,7 @@ class StableDiffusionProcessing:
         self.vae_decoder_tiled = VAEDecodeTiled()
 
         if self.tiled_decode:
-            print("[USDU] Using tiled decode")
+            logger.info("Using tiled decode")
 
         # Other required A1111 variables for the USDU script that is currently unused in this script
         self.extra_generation_params = {}
@@ -118,7 +122,7 @@ class StableDiffusionProcessing:
                 self.tiles += (self.rows - 1) * self.cols + (self.cols - 1) * self.rows
             elif seam_fix_mode.value == USDUSFMode.HALF_TILE_PLUS_INTERSECTIONS.value:
                 self.tiles += (self.rows - 1) * self.cols + (self.cols - 1) * self.rows + (self.rows - 1) * (self.cols - 1)
-            self.pbar = None
+            self.pbar: Optional[tqdm] = None
             # self.pbar = tqdm(total=self.tiles, desc='USDU') # Creating the pbar here will cause an empty progress bar to be displayed
 
     def __del__(self):
@@ -142,7 +146,7 @@ def fix_seed(p: StableDiffusionProcessing):
 
 
 def sample(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent, denoise, custom_sampler, custom_sigmas):
-    # Choose way to sample based on given inputs
+    """Choose the way to sample based on given inputs"""
 
     # Custom sampler and sigmas
     if custom_sampler is not None and custom_sigmas is not None:
@@ -238,6 +242,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 
     # Update the progress bar
     if p.progress_bar_enabled:
+        assert p.pbar is not None
         p.pbar.update(1)
 
     # Decode the sample
@@ -275,5 +280,5 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 
         shared.batch[i] = result
 
-    processed = Processed(p, [shared.batch[0]], p.seed, None)
+    processed = Processed(p, [shared.batch[0]], p.seed, "")
     return processed

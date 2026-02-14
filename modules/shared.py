@@ -21,5 +21,5 @@ sd_upscalers = [None]
 actual_upscaler = None
 
 # Batch of images to upscale
-batch = None
+batch = []
 batch_as_tensor = None

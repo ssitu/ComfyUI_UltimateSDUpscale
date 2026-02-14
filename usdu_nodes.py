@@ -1,6 +1,7 @@
 # ComfyUI Node for Ultimate SD Upscale by Coyote-A: https://github.com/Coyote-A/ultimate-upscale-for-automatic1111
 
 import logging
+from contextlib import contextmanager
 import torch
 import comfy
 from usdu_patch import usdu
@@ -8,6 +9,20 @@ from usdu_utils import tensor_to_pil, pil_to_tensor
 from modules.processing import StableDiffusionProcessing
 import modules.shared as shared
 from modules.upscaler import UpscalerData
+
+logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def suppress_logging(level=logging.CRITICAL + 1):
+    """Context manager to temporarily suppress logging output."""
+    root_logger = logging.getLogger()
+    old_level = root_logger.getEffectiveLevel()
+    root_logger.setLevel(level)
+    try:
+        yield
+    finally:
+        root_logger.setLevel(old_level)
 
 MAX_RESOLUTION = 8192
 # The modes available for Ultimate SD Upscale
@@ -127,7 +142,7 @@ class UltimateSDUpscale:
         shared.batch = [tensor_to_pil(image, i) for i in range(len(image))]
         shared.batch_as_tensor = image
 
-        print(f"[USDU Batch Debug] UltimateSDUpscale.upscale() using batch_size={batch_size}")
+        logger.debug("UltimateSDUpscale.upscale() using batch_size=%s", batch_size)
         assert batch_size == 1 or force_uniform_tiles, "batch_size greater than 1 requires force_uniform_tiles to be True; all tiles in the batch must be the same size."
 
         # Processing
@@ -137,13 +152,10 @@ class UltimateSDUpscale:
             tile_width, tile_height, redraw_mode, seam_fix_mode,
             custom_sampler, custom_sigmas, batch_size,
         )
-        print(f"[USDU Batch Debug] StableDiffusionProcessing created with batch_size={sdprocessing.batch_size}")
+        logger.debug("StableDiffusionProcessing created with batch_size=%s", sdprocessing.batch_size)
 
-        # Disable logging
-        logger = logging.getLogger()
-        old_level = logger.getEffectiveLevel()
-        logger.setLevel(logging.CRITICAL + 1)
-        try:
+        # Suppress logging to prevent duplicate tqdm progress bars
+        with suppress_logging():
             #
             # Running the script
             #
@@ -156,13 +168,10 @@ class UltimateSDUpscale:
                                seams_fix_type=seam_fix_mode, target_size_type=2,
                                custom_width=None, custom_height=None, custom_scale=upscale_by)
 
-            # Return the resulting images
-            images = [pil_to_tensor(img) for img in shared.batch]
-            tensor = torch.cat(images, dim=0)
-            return (tensor,)
-        finally:
-            # Restore the original logging level
-            logger.setLevel(old_level)
+        # Return the resulting images
+        images = [pil_to_tensor(img) for img in shared.batch]
+        tensor = torch.cat(images, dim=0)
+        return (tensor,)
 
 class UltimateSDUpscaleNoUpscale(UltimateSDUpscale):
     @classmethod
@@ -186,7 +195,7 @@ class UltimateSDUpscaleNoUpscale(UltimateSDUpscale):
                 seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode, batch_size=1):
         upscale_by = 1.0
 
-        print(f"[USDU Batch Debug] UltimateSDUpscaleNoUpscale.upscale() received batch_size={batch_size}")
+        logger.debug("UltimateSDUpscaleNoUpscale.upscale() received batch_size=%s", batch_size)
 
         return super().upscale(upscaled_image, model, positive, negative, vae, upscale_by, seed,
                                steps, cfg, sampler_name, scheduler, denoise, None,

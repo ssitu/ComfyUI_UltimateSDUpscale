@@ -1,12 +1,15 @@
+import logging
 import sys
 import os
+
+logger = logging.getLogger(__name__)
 
 # Check for original USDU script
 current_dir = os.path.dirname(os.path.realpath(__file__))
 repos_dir = os.path.join(current_dir, "repositories")
 usdu_dir = os.path.join(repos_dir, "ultimate_sd_upscale")
 if not len(os.listdir(usdu_dir)):
-    print("[USDU] Original USDU script not found, downloading it from https://github.com/Coyote-A/ultimate-upscale-for-automatic1111")
+    logger.info("Original USDU script not found, downloading it from https://github.com/Coyote-A/ultimate-upscale-for-automatic1111")
     import urllib.request
     import zipfile
     import shutil
@@ -26,7 +29,7 @@ if not len(os.listdir(usdu_dir)):
                     shutil.copyfileobj(fsrc=zip_ref.open(member), fdst=target_file)
 
     os.remove(zip_path)
-    print("[USDU] Original USDU script downloaded successfully")
+    logger.info("Original USDU script downloaded successfully")
 
 # Remove other custom_node paths from sys.path to avoid conflicts
 custom_node_paths = [path for path in sys.path if "custom_node" in path]
