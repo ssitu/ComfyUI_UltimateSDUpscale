@@ -10,19 +10,19 @@ Preserves original behavior but:
 """
 
 from __future__ import annotations
-
+from functools import wraps
 import logging
 import math
-import numpy as np
-import torch
+from typing import Tuple, List
 
-from functools import wraps
-from typing import Tuple, List, Iterable
 from PIL import Image, ImageFilter, ImageDraw
+import torch
+from tqdm import tqdm
+
 from comfy_extras.nodes_custom_sampler import SamplerCustom
+from nodes import common_ksampler, VAEEncode, VAEDecode, VAEDecodeTiled
 
 import modules.shared as shared
-from nodes import common_ksampler, VAEEncode, VAEDecode, VAEDecodeTiled
 from repositories import ultimate_upscale as usdu
 import usdu_utils
 
@@ -260,6 +260,9 @@ def _process_batch_tiles(p,
     if not tiles_coords or not images:
         return images
 
+    if p.progress_bar_enabled and p.pbar is None:
+        p.pbar = tqdm(total=getattr(p, "tiles", 0), desc='USDU', unit='tile')
+
     batch_tiles = []
     batch_masks = []
     batch_crop_regions = []
@@ -287,9 +290,9 @@ def _process_batch_tiles(p,
                       positive_cropped, negative_cropped, latent, p.denoise,
                       p.custom_sampler, p.custom_sigmas)
 
-    # Update progress bar if present
-    if getattr(p, "progress_bar_enabled", False) and getattr(p, "pbar", None) is not None:
-        p.pbar.update(len(list(tiles_coords)))
+    # Update progress bar
+    if p.progress_bar_enabled:
+        p.pbar.update(len(tiles_coords))
 
     # Decode
     if not getattr(p, "tiled_decode", False):
