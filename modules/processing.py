@@ -6,7 +6,7 @@ from comfy_extras.nodes_custom_sampler import SamplerCustom
 from usdu_utils import pil_to_tensor, tensor_to_pil, get_crop_region, expand_crop, crop_cond
 from modules import shared
 from tqdm import tqdm
-import comfy
+import comfy.utils as comfy_utils
 from enum import Enum
 import json
 import os
@@ -106,9 +106,9 @@ class StableDiffusionProcessing:
 
         # Progress bar for the entire process instead of per tile
         self.progress_bar_enabled = False
-        if comfy.utils.PROGRESS_BAR_ENABLED:
+        if comfy_utils.PROGRESS_BAR_ENABLED:
             self.progress_bar_enabled = True
-            comfy.utils.PROGRESS_BAR_ENABLED = config.get('per_tile_progress', True)
+            comfy_utils.PROGRESS_BAR_ENABLED = config.get('per_tile_progress', True)
             self.tiles = 0
             if redraw_mode.value != USDUMode.NONE.value:
                 self.tiles += self.rows * self.cols
@@ -124,7 +124,7 @@ class StableDiffusionProcessing:
     def __del__(self):
         # Undo changes to progress bar flag when node is done or cancelled
         if self.progress_bar_enabled:
-            comfy.utils.PROGRESS_BAR_ENABLED = True
+            comfy_utils.PROGRESS_BAR_ENABLED = True
     
 class Processed:
 
