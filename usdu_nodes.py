@@ -110,18 +110,8 @@ class UltimateSDUpscale:
                 seam_fix_mode, seam_fix_denoise, seam_fix_mask_blur,
                 seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode, batch_size=1,
                 custom_sampler=None, custom_sigmas=None):
-        # Store params
-        self.tile_width = tile_width
-        self.tile_height = tile_height
-        self.mask_blur = mask_blur
-        self.tile_padding = tile_padding
-        self.seam_fix_width = seam_fix_width
-        self.seam_fix_denoise = seam_fix_denoise
-        self.seam_fix_padding = seam_fix_padding
-        self.seam_fix_mode = seam_fix_mode
-        self.mode_type = mode_type
-        self.upscale_by = upscale_by
-        self.seam_fix_mask_blur = seam_fix_mask_blur
+        redraw_mode = MODES[mode_type]
+        seam_fix_mode = SEAM_FIX_MODES[seam_fix_mode]
 
         #
         # Set up A1111 patches
@@ -137,8 +127,6 @@ class UltimateSDUpscale:
         shared.batch = [tensor_to_pil(image, i) for i in range(len(image))]
         shared.batch_as_tensor = image
 
-        # Store batch_size for use in processing
-        self.batch_size = batch_size
         print(f"[USDU Batch Debug] UltimateSDUpscale.upscale() using batch_size={batch_size}")
         assert batch_size == 1 or force_uniform_tiles, "batch_size greater than 1 requires force_uniform_tiles to be True; all tiles in the batch must be the same size."
 
@@ -146,7 +134,7 @@ class UltimateSDUpscale:
         sdprocessing = StableDiffusionProcessing(
             shared.batch[0], model, positive, negative, vae,
             seed, steps, cfg, sampler_name, scheduler, denoise, upscale_by, force_uniform_tiles, tiled_decode,
-            tile_width, tile_height, MODES[self.mode_type], SEAM_FIX_MODES[self.seam_fix_mode],
+            tile_width, tile_height, redraw_mode, seam_fix_mode,
             custom_sampler, custom_sigmas, batch_size,
         )
         print(f"[USDU Batch Debug] StableDiffusionProcessing created with batch_size={sdprocessing.batch_size}")
@@ -160,13 +148,13 @@ class UltimateSDUpscale:
             # Running the script
             #
             script = usdu.Script()
-            processed = script.run(p=sdprocessing, _=None, tile_width=self.tile_width, tile_height=self.tile_height,
-                               mask_blur=self.mask_blur, padding=self.tile_padding, seams_fix_width=self.seam_fix_width,
-                               seams_fix_denoise=self.seam_fix_denoise, seams_fix_padding=self.seam_fix_padding,
-                               upscaler_index=0, save_upscaled_image=False, redraw_mode=MODES[self.mode_type],
-                               save_seams_fix_image=False, seams_fix_mask_blur=self.seam_fix_mask_blur,
-                               seams_fix_type=SEAM_FIX_MODES[self.seam_fix_mode], target_size_type=2,
-                               custom_width=None, custom_height=None, custom_scale=self.upscale_by)
+            processed = script.run(p=sdprocessing, _=None, tile_width=tile_width, tile_height=tile_height,
+                               mask_blur=mask_blur, padding=tile_padding, seams_fix_width=seam_fix_width,
+                               seams_fix_denoise=seam_fix_denoise, seams_fix_padding=seam_fix_padding,
+                               upscaler_index=0, save_upscaled_image=False, redraw_mode=redraw_mode,
+                               save_seams_fix_image=False, seams_fix_mask_blur=seam_fix_mask_blur,
+                               seams_fix_type=seam_fix_mode, target_size_type=2,
+                               custom_width=None, custom_height=None, custom_scale=upscale_by)
 
             # Return the resulting images
             images = [pil_to_tensor(img) for img in shared.batch]
@@ -198,8 +186,6 @@ class UltimateSDUpscaleNoUpscale(UltimateSDUpscale):
                 seam_fix_width, seam_fix_padding, force_uniform_tiles, tiled_decode, batch_size=1):
         upscale_by = 1.0
 
-        # Store batch_size for use in processing
-        self.batch_size = batch_size
         print(f"[USDU Batch Debug] UltimateSDUpscaleNoUpscale.upscale() received batch_size={batch_size}")
 
         return super().upscale(upscaled_image, model, positive, negative, vae, upscale_by, seed,
