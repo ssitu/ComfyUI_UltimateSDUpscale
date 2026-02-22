@@ -194,7 +194,8 @@ class TestZImageFunControlNet:
         # Verify reference image match
         logger = logging.getLogger(TestZImageFunControlNet.__name__)
         test_img_dir = test_dirs.test_images
-        filename = CATEGORY / (f"controlnet_zimage_fun_{i + 1}_batch{batch_size}" + EXT)
+        batch_str = f"_batch{batch_size}" if batch_size > 1 else ""
+        filename = CATEGORY / (f"controlnet_zimage_fun_{i + 1}{batch_str}" + EXT)
         sample_dir = test_dirs.sample_images
         save_image(upscaled, sample_dir / filename)
         upscaled = load_image(sample_dir / filename)
