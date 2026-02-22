@@ -20,6 +20,7 @@ import torch
 from tqdm import tqdm
 
 from comfy_extras.nodes_custom_sampler import SamplerCustom
+from crop_model_patch import crop_model_cond
 from nodes import common_ksampler, VAEEncode, VAEDecode, VAEDecodeTiled
 
 import modules.shared as shared
@@ -285,10 +286,11 @@ def _process_batch_tiles(p,
     positive_cropped = usdu_utils.crop_cond(p.positive, batch_crop_regions, p.init_size, images[0].size, first_tile_size)
     negative_cropped = usdu_utils.crop_cond(p.negative, batch_crop_regions, p.init_size, images[0].size, first_tile_size)
 
-    # Sampling
-    samples = _sample(p.model, p.seed, p.steps, p.cfg, p.sampler_name, p.scheduler,
-                      positive_cropped, negative_cropped, latent, p.denoise,
-                      p.custom_sampler, p.custom_sigmas)
+    with crop_model_cond(p.model, batch_crop_regions, p.init_size, images[0].size, first_tile_size) as model:
+        # Sampling
+        samples = _sample(model, p.seed, p.steps, p.cfg, p.sampler_name, p.scheduler,
+                        positive_cropped, negative_cropped, latent, p.denoise,
+                        p.custom_sampler, p.custom_sigmas)
 
     # Update progress bar
     if p.progress_bar_enabled:
