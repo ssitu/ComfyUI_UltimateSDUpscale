@@ -23,8 +23,10 @@ def crop_model_cond(
     patched = set()
     for module, module_patches in patches.items():
         for patch in module_patches:
+            print(f"Processing patch {type(patch).__name__} in module {module} with id {id(patch)}")
             if id(patch) in patched:
                 # Avoid cropping the same patch multiple times if it appears in multiple modules
+                print(f"Skipping patch with id {id(patch)} as it has already been processed")
                 continue
             if type(patch).__name__ in ("DiffSynthCnetPatch", "ZImageControlPatch"):
                 crop_control_patch(patch, crop_regions, canvas_size, latent_crop)
