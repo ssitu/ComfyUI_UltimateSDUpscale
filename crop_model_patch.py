@@ -1,7 +1,11 @@
 from contextlib import contextmanager
+import logging
 import torch
 
 from usdu_utils import resize_region
+
+
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -25,12 +29,12 @@ def crop_model_cond(
     applied_croppers = {}
     for module, module_patches in patches.items():
         for patch in module_patches:
-            print(
+            logger.debug(
                 f"Processing patch {type(patch).__name__} in module {module} with id {id(patch)}"
             )
             if id(patch) in applied_croppers:
                 # Avoid cropping the same patch multiple times if it appears in multiple modules
-                print(
+                logger.debug(
                     f"Skipping patch with id {id(patch)} as it has already been processed"
                 )
                 continue
@@ -44,7 +48,7 @@ def crop_model_cond(
     finally:
         # Restore original model
         for patch_id, cropper in applied_croppers.items():
-            print(f"Restoring patch with id {patch_id}")
+            logger.debug(f"Restoring patch with id {patch_id}")
             del cropper
 
 
@@ -118,7 +122,7 @@ class ModelPatchCropper:
         # Concatenate all cropped images along the batch dimension
 
         concatenated_image = torch.cat(cropped_images, dim=0)
-        print(
+        logger.debug(
             f"Cropped {patch_class} image from {patch.image.shape} to {concatenated_image.shape}"
         )
         patch.image = concatenated_image
