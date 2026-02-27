@@ -12,6 +12,7 @@ from enum import Enum
 import json
 import os
 from typing import Optional
+from crop_model_patch import crop_model_cond
 
 logger = logging.getLogger(__name__)
 
@@ -236,9 +237,10 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     batched_tiles = torch.cat([pil_to_tensor(tile) for tile in tiles], dim=0)
     (latent,) = p.vae_encoder.encode(p.vae, batched_tiles)
 
-    # Generate samples
-    samples = sample(p.model, p.seed, p.steps, p.cfg, p.sampler_name, p.scheduler, positive_cropped,
-                     negative_cropped, latent, p.denoise, p.custom_sampler, p.custom_sigmas)
+    with crop_model_cond(p.model, crop_region, p.init_size, init_image.size, tile_size) as model:
+        # Generate samples
+        samples = sample(model, p.seed, p.steps, p.cfg, p.sampler_name, p.scheduler, positive_cropped,
+                        negative_cropped, latent, p.denoise, p.custom_sampler, p.custom_sigmas)
 
     # Update the progress bar
     if p.progress_bar_enabled:
